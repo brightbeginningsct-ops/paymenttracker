@@ -128,19 +128,19 @@ function getNextMonday() { const d = new Date(now); d.setDate(d.getDate() + ((1 
 function getNextMonth() { const d = new Date(now); d.setMonth(d.getMonth() + 1); return d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }); }
 
 // --- DATABASE & CLOUD STATE ---
+// Upgraded to v7 to support Linked Payments and Archive logic cleanly
 let dbCache = {
-  pt_programs_v6: [],
-  pt_charges_v6: [],
-  pt_customers_v6: [],
-  pt_txns_v6: []
+  pt_programs_v7: [],
+  pt_charges_v7: [],
+  pt_customers_v7: [],
+  pt_txns_v7: []
 };
 
-// ⚠️ We use a highly specific root node "bb_payments_system" to ensure 0 overlap with your TimeClock
 const DB = {
-  getPrograms() { return dbCache.pt_programs_v6 || []; },
-  getCharges() { return dbCache.pt_charges_v6 || []; },
-  getCustomers() { return dbCache.pt_customers_v6 || []; },
-  getTxns() { return dbCache.pt_txns_v6 || []; },
+  getPrograms() { return dbCache.pt_programs_v7 || []; },
+  getCharges() { return dbCache.pt_charges_v7 || []; },
+  getCustomers() { return dbCache.pt_customers_v7 || []; },
+  getTxns() { return dbCache.pt_txns_v7 || []; },
   set(k, v) {
     dbCache[k] = v; 
     fbSet(ref(db, 'bb_payments_system/' + k), v); 
@@ -168,7 +168,7 @@ function getCustomerBalance(custId) {
 onValue(ref(db, 'bb_payments_system'), (snapshot) => {
   const data = snapshot.val();
   
-  if (data && data.pt_customers_v6 && data.pt_customers_v6.length > 0) {
+  if (data && data.pt_customers_v7 && data.pt_customers_v7.length > 0) {
     dbCache = { ...dbCache, ...data };
     render(); 
   } else {
@@ -248,12 +248,10 @@ onValue(ref(db, 'bb_payments_system'), (snapshot) => {
       { id: 'c_42', name: 'Howe', progs: [], email: '', phone: '', address: '', archived: false }
     ];
 
-    fbSet(ref(db, 'bb_payments_system/pt_programs_v6'), masterPrograms);
-    fbSet(ref(db, 'bb_payments_system/pt_charges_v6'), masterCharges);
-    fbSet(ref(db, 'bb_payments_system/pt_customers_v6'), masterCustomers);
-    
-    const localTxns = JSON.parse(localStorage.getItem('pt_txns_v6')) || [];
-    fbSet(ref(db, 'bb_payments_system/pt_txns_v6'), localTxns);
+    fbSet(ref(db, 'bb_payments_system/pt_programs_v7'), masterPrograms);
+    fbSet(ref(db, 'bb_payments_system/pt_charges_v7'), masterCharges);
+    fbSet(ref(db, 'bb_payments_system/pt_customers_v7'), masterCustomers);
+    fbSet(ref(db, 'bb_payments_system/pt_txns_v7'), []);
   }
 });
 
@@ -322,7 +320,6 @@ function renderDashboard() {
   const programs = DB.getPrograms();
   const txns = DB.getTxns();
 
-  // SPLIT ACTIVE VS ARCHIVED
   const activeCusts = allCustomers.filter(c => !c.archived);
   const archivedCusts = allCustomers.filter(c => c.archived);
 
@@ -583,16 +580,36 @@ function renderCustomerDetail() {
         <thead><tr><th>Date</th><th>Type</th><th>Description</th><th>Amount</th></tr></thead>
         <tbody>
           ${txns.length === 0 ? '<tr><td colspan="4" style="text-align:center; color:var(--muted); padding: 40px;">No transaction history yet.</td></tr>' : ''}
-          ${txns.map(t => `
-            <tr>
-              <td class="col-mono" style="font-weight:600">${new Date(t.date).toLocaleDateString()}</td>
-              <td><span class="badge badge-${t.type === 'payment' ? 'gn' : 'rd'}">${t.type === 'payment' ? 'Payment' : 'Charge'}</span></td>
-              <td style="color:var(--text); font-weight:600">${t.note}</td>
-              <td class="col-mono ${t.type === 'payment' ? 'val-collected' : 'val-owed'}">
-                ${t.type === 'payment' ? '-' : ''}$${fmtH(t.amount)}
-              </td>
-            </tr>
-          `).join('')}
+          ${txns.map(t => {
+            // NEW LINKED PAYMENT UI LOGIC
+            let extraBadge = '';
+            let linkedNote = '';
+            
+            if (t.type === 'charge') {
+               const linkedPmt = txns.find(p => p.type === 'payment' && p.linkedToId === t.id);
+               if (linkedPmt) {
+                  extraBadge = '<span class="badge badge-gn" style="margin-left: 8px;">Paid</span>';
+               } else {
+                  extraBadge = '<span class="badge badge-rd" style="margin-left: 8px;">Unpaid</span>';
+               }
+            } else if (t.type === 'payment' && t.linkedToId) {
+               const linkedCharge = txns.find(c => c.id === t.linkedToId);
+               if (linkedCharge) {
+                  linkedNote = `<br><span style="font-size:11px; color:var(--muted)">↳ Applied to ${new Date(linkedCharge.date).toLocaleDateString()} charge</span>`;
+               }
+            }
+
+            return `
+              <tr>
+                <td class="col-mono" style="font-weight:600">${new Date(t.date).toLocaleDateString()}</td>
+                <td><span class="badge badge-${t.type === 'payment' ? 'gn' : 'rd'}">${t.type === 'payment' ? 'Payment' : 'Charge'}</span>${extraBadge}</td>
+                <td style="color:var(--text); font-weight:600">${t.note}${linkedNote}</td>
+                <td class="col-mono ${t.type === 'payment' ? 'val-collected' : 'val-owed'}">
+                  ${t.type === 'payment' ? '-' : ''}$${fmtH(t.amount)}
+                </td>
+              </tr>
+            `;
+          }).join('')}
         </tbody>
       </table>
     </div>
@@ -771,11 +788,33 @@ function renderModal() {
 
   if (S.showModal === 'add-payment') {
     const activeBal = getCustomerBalance(activeCust.id);
+    const allTxns = DB.getTxns();
+    
+    // Find all charges for this customer that don't have a corresponding linked payment
+    const unpaidCharges = allTxns.filter(t => 
+      t.custId === activeCust.id && 
+      t.type === 'charge' && 
+      !allTxns.some(p => p.type === 'payment' && p.linkedToId === t.id)
+    );
+
     return `
       <div class="modal-overlay">
         <div class="modal">
           <h2>Receive Payment</h2>
           <p style="font-size: 14px; font-weight: 800; color: var(--text2); margin-bottom: 20px;">Receiving from: <strong style="color: var(--blue)">${activeCust?.name}</strong></p>
+          
+          <div class="field">
+            <label>Apply to Specific Charge (Optional)</label>
+            <select id="m-linked-charge" data-a="select-linked-charge">
+              <option value="">-- General Payment (Unlinked) --</option>
+              ${unpaidCharges.map(c => `
+                <option value="${c.id}" data-amt="${c.amount}">
+                  ${new Date(c.date).toLocaleDateString()} - ${c.note} ($${fmtH(c.amount)})
+                </option>
+              `).join('')}
+            </select>
+          </div>
+
           <div class="field"><label>Date Received</label><input type="date" id="m-date" value="${now.toISOString().split('T')[0]}"></div>
           <div class="field"><label>Amount Paid ($)</label><input type="number" id="m-amt" step="0.01" value="${activeBal > 0 ? fmtH(activeBal) : ''}" placeholder="0.00"></div>
           <div class="field"><label>Payment Method / Note</label><input type="text" id="m-note" placeholder="e.g. Venmo, Check #1234"></div>
@@ -805,6 +844,18 @@ function bindEvents() {
   const rateSelect = document.getElementById('m-quick-rates');
   if(rateSelect) {
     rateSelect.onchange = () => updateChargeDesc();
+  }
+
+  // Auto-fill payment amount when an unpaid charge is selected
+  const linkSelect = document.getElementById('m-linked-charge');
+  if(linkSelect) {
+    linkSelect.onchange = (e) => {
+      if (e.target.selectedIndex > 0) {
+        const opt = e.target.options[e.target.selectedIndex];
+        const amt = opt.getAttribute('data-amt');
+        document.getElementById('m-amt').value = amt;
+      }
+    };
   }
 
   document.querySelectorAll('[data-a]').forEach(btn => {
@@ -841,7 +892,7 @@ function bindEvents() {
         const idx = customers.findIndex(c => c.id === S.selCustId);
         if (idx > -1) {
           customers[idx].progs = [...S.draftPrograms];
-          DB.set('pt_customers_v6', customers);
+          DB.set('pt_customers_v7', customers);
           set({}); 
         }
       }
@@ -867,13 +918,13 @@ function bindEvents() {
             customers[idx].email = email;
             customers[idx].phone = phone;
             customers[idx].address = address;
-            DB.set('pt_customers_v6', customers);
+            DB.set('pt_customers_v7', customers);
             set({ showModal: null });
           }
         } else {
           const newId = 'c_' + genId();
           customers.push({ id: newId, name, email, phone, address, progs: [], archived: false });
-          DB.set('pt_customers_v6', customers);
+          DB.set('pt_customers_v7', customers);
           set({ showModal: null, view: 'customer', selCustId: newId, draftPrograms: [] });
         }
       }
@@ -884,22 +935,19 @@ function bindEvents() {
           const idx = customers.findIndex(c => c.id === S.selCustId);
           if (idx > -1) {
             customers[idx].archived = !customers[idx].archived;
-            DB.set('pt_customers_v6', customers);
+            DB.set('pt_customers_v7', customers);
             set({ showModal: null, view: 'dashboard', selCustId: null });
           }
         }
       }
 
-      // THE NEW DELETE LOGIC
       if (action === 'delete-customer') {
         if(confirm("Are you absolutely sure you want to permanently delete this family? This cannot be undone and their payment history will be deleted.")) {
-          // Remove the customer
           const customers = DB.getCustomers().filter(c => c.id !== S.selCustId);
-          DB.set('pt_customers_v6', customers);
+          DB.set('pt_customers_v7', customers);
           
-          // Clean up their transactions so they don't float around invisibly
           const txns = DB.getTxns().filter(t => t.custId !== S.selCustId);
-          DB.set('pt_txns_v6', txns);
+          DB.set('pt_txns_v7', txns);
           
           set({ showModal: null, view: 'dashboard', selCustId: null });
         }
@@ -923,20 +971,20 @@ function bindEvents() {
           programs.push({ id: 'p_' + genId(), name, rate, freq });
         }
         
-        DB.set('pt_programs_v6', programs);
+        DB.set('pt_programs_v7', programs);
         set({ showModal: null, tempId: null });
       }
 
       if (action === 'delete-program') {
         if(confirm("Are you sure you want to delete this program?")) {
           const programs = DB.getPrograms().filter(p => p.id !== S.tempId);
-          DB.set('pt_programs_v6', programs);
+          DB.set('pt_programs_v7', programs);
           
           const customers = DB.getCustomers().map(c => {
             if (c.progs) c.progs = c.progs.filter(dp => dp.id !== S.tempId);
             return c;
           });
-          DB.set('pt_customers_v6', customers);
+          DB.set('pt_customers_v7', customers);
           
           set({ showModal: null, tempId: null });
         }
@@ -958,14 +1006,14 @@ function bindEvents() {
           charges.push({ id: 'ch_' + genId(), name, amount });
         }
         
-        DB.set('pt_charges_v6', charges);
+        DB.set('pt_charges_v7', charges);
         set({ showModal: null, tempId: null });
       }
 
       if (action === 'delete-charge') {
         if(confirm("Are you sure you want to delete this standard charge?")) {
           const charges = DB.getCharges().filter(c => c.id !== S.tempId);
-          DB.set('pt_charges_v6', charges);
+          DB.set('pt_charges_v7', charges);
           set({ showModal: null, tempId: null });
         }
       }
@@ -976,9 +1024,27 @@ function bindEvents() {
         const date = document.getElementById('m-date').value;
         const desc = document.getElementById('m-note').value.trim();
         if (isNaN(amount) || !date) return;
+
+        let linkedToId = null;
+        if (type === 'payment') {
+          const linkedSelect = document.getElementById('m-linked-charge');
+          if (linkedSelect && linkedSelect.value) {
+            linkedToId = linkedSelect.value;
+          }
+        }
+
         const txns = DB.getTxns();
-        txns.push({ id: 'tx_' + genId(), custId: S.selCustId, type, amount, date, note: desc || (type === 'charge' ? 'Manual Charge' : 'Payment') });
-        DB.set('pt_txns_v6', txns);
+        txns.push({ 
+          id: 'tx_' + genId(), 
+          custId: S.selCustId, 
+          type, 
+          amount, 
+          date, 
+          note: desc || (type === 'charge' ? 'Manual Charge' : 'Payment'),
+          linkedToId: linkedToId 
+        });
+        
+        DB.set('pt_txns_v7', txns);
         set({ showModal: null });
       }
     };
