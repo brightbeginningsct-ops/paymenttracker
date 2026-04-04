@@ -128,7 +128,7 @@ function getNextMonday() { const d = new Date(now); d.setDate(d.getDate() + ((1 
 function getNextMonth() { const d = new Date(now); d.setMonth(d.getMonth() + 1); return d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }); }
 
 // --- DATABASE & CLOUD STATE ---
-// Upgraded to v7 to support Linked Payments and Archive logic cleanly
+// Using v7 for linked payments and archive logic
 let dbCache = {
   pt_programs_v7: [],
   pt_charges_v7: [],
@@ -136,6 +136,7 @@ let dbCache = {
   pt_txns_v7: []
 };
 
+// ⚠️ We use a highly specific root node "bb_payments_system" to ensure 0 overlap with your TimeClock
 const DB = {
   getPrograms() { return dbCache.pt_programs_v7 || []; },
   getCharges() { return dbCache.pt_charges_v7 || []; },
@@ -164,94 +165,16 @@ function getCustomerBalance(custId) {
     .reduce((sum, t) => sum + (t.type === 'charge' ? t.amount : -t.amount), 0);
 }
 
-// --- CLOUD SYNC & HARDCODED BOOTSTRAP ---
+// --- CLOUD SYNC ---
+// Clean listener without any hardcoded overrides.
 onValue(ref(db, 'bb_payments_system'), (snapshot) => {
   const data = snapshot.val();
   
-  if (data && data.pt_customers_v7 && data.pt_customers_v7.length > 0) {
+  if (data) {
     dbCache = { ...dbCache, ...data };
     render(); 
   } else {
-    console.log("Firebase is empty! Forcing the master list backup to the cloud...");
-    
-    const masterPrograms = [
-      { id: 'p_01', name: 'Infant Care (5 Days)', rate: 272.00, freq: 'weekly' },
-      { id: 'p_02', name: 'Waddler/Toddler (5 Days)', rate: 272.00, freq: 'weekly' },
-      { id: 'p_03', name: 'Waddler/Toddler (3 Days)', rate: 190.00, freq: 'weekly' },
-      { id: 'p_04', name: 'Waddler/Toddler (2 Days)', rate: 129.00, freq: 'weekly' },
-      { id: 'p_05', name: 'Preschool (5 Days) - Trained', rate: 214.00, freq: 'weekly' },
-      { id: 'p_06', name: 'Preschool (3 Days) - Trained', rate: 161.00, freq: 'weekly' },
-      { id: 'p_07', name: 'Preschool (2 Days) - Trained', rate: 108.00, freq: 'weekly' },
-      { id: 'p_08', name: 'Preschool (5 Days) - Untrained', rate: 239.00, freq: 'weekly' },
-      { id: 'p_09', name: 'Preschool (3 Days) - Untrained', rate: 176.00, freq: 'weekly' },
-      { id: 'p_10', name: 'Preschool (2 Days) - Untrained', rate: 118.00, freq: 'weekly' },
-      { id: 'p_11', name: 'Nursery School (5 Days)', rate: 396.00, freq: 'monthly' },
-      { id: 'p_12', name: 'Nursery School (3 Days)', rate: 263.00, freq: 'monthly' },
-      { id: 'p_13', name: 'Nursery School (2 Days)', rate: 214.00, freq: 'monthly' },
-      { id: 'p_14', name: 'Before School Only', rate: 311.00, freq: 'monthly' },
-      { id: 'p_15', name: 'After School Only', rate: 311.00, freq: 'monthly' },
-      { id: 'p_16', name: 'Before & After School', rate: 380.00, freq: 'monthly' },
-      { id: 'p_17', name: 'Nursery School (5 Days) - Untrained', rate: 426.00, freq: 'monthly' },
-      { id: 'p_18', name: 'Nursery School (3 Days) - Untrained', rate: 288.00, freq: 'monthly' },
-      { id: 'p_19', name: 'Nursery School (2 Days) - Untrained', rate: 234.00, freq: 'monthly' }
-    ];
-
-    const masterCharges = [
-      { id: 'ch_1', name: 'Half Day Fee', amount: 15.00 },
-      { id: 'ch_2', name: 'Full Day Fee', amount: 50.00 },
-      { id: 'ch_3', name: 'Late Fee', amount: 10.00 },
-      { id: 'ch_4', name: 'Registration Fee', amount: 45.00 }
-    ];
-
-    const masterCustomers = [
-      { id: 'c_01', name: 'Beringer', progs: [{id: 'p_11', disc: 0}], email: '', phone: '', address: '', archived: false },
-      { id: 'c_02', name: 'Cartier / Weber', progs: [{id: 'p_19', disc: 0}], email: '', phone: '', address: '', archived: false },
-      { id: 'c_03', name: 'Blain', progs: [{id: 'p_01', disc: 0}], email: '', phone: '', address: '', archived: false },
-      { id: 'c_04', name: 'Boehning', progs: [{id: 'p_08', disc: 0}], email: '', phone: '', address: '', archived: false },
-      { id: 'c_05', name: 'Boudreau', progs: [{id: 'p_06', disc: 0}], email: '', phone: '', address: '', archived: false },
-      { id: 'c_06', name: 'Bourlogiannis', progs: [{id: 'p_06', disc: 10}, {id: 'p_09', disc: 0}], email: '', phone: '', address: '', archived: false }, 
-      { id: 'c_07', name: 'Byron / Peters', progs: [{id: 'p_01', disc: 0}], email: '', phone: '', address: '', archived: false },
-      { id: 'c_08', name: 'Cap / Mitchell', progs: [], email: '', phone: '', address: '', archived: false },
-      { id: 'c_09', name: 'Hollywood', progs: [{id: 'p_06', disc: 0}], email: '', phone: '', address: '', archived: false },
-      { id: 'c_10', name: 'Fecteau', progs: [], email: '', phone: '', address: '', archived: false },
-      { id: 'c_11', name: 'DeGrosse', progs: [], email: '', phone: '', address: '', archived: false },
-      { id: 'c_12', name: 'Despierre', progs: [], email: '', phone: '', address: '', archived: false },
-      { id: 'c_13', name: 'Dominic', progs: [], email: '', phone: '', address: '', archived: false },
-      { id: 'c_14', name: 'Federici', progs: [{id: 'p_05', disc: 0}], email: 'acastro924@yahoo.com', phone: '', address: '', archived: false },
-      { id: 'c_15', name: 'Grasso', progs: [{id: 'p_05', disc: 0}], email: 'dlgrasso80@gmail.com', phone: '', address: '', archived: false },
-      { id: 'c_16', name: 'Gugliotti', progs: [], email: '', phone: '', address: '', archived: false },
-      { id: 'c_17', name: 'Hanewicz', progs: [{id: 'p_02', disc: 0}], email: '', phone: '', address: '', archived: false },
-      { id: 'c_18', name: 'Harlow', progs: [{id: 'p_05', disc: 0}], email: 'Kathleenharlow5@gmail.com', phone: '', address: '', archived: false },
-      { id: 'c_19', name: 'Henry', progs: [{id: 'p_08', disc: 0}], email: '', phone: '', address: '', archived: false },
-      { id: 'c_20', name: 'Husted', progs: [], email: '', phone: '', address: '', archived: false },
-      { id: 'c_21', name: 'Kane / Letis', progs: [{id: 'p_05', disc: 0}], email: '', phone: '', address: '', archived: false },
-      { id: 'c_22', name: 'Kent / Henderson / Washington', progs: [{id: 'p_10', disc: 0}], email: '', phone: '', address: '', archived: false },
-      { id: 'c_23', name: 'Kiefer', progs: [], email: '', phone: '', address: '', archived: false },
-      { id: 'c_24', name: 'Lane / Winkler', progs: [{id: 'p_05', disc: 0}], email: 'kaylamfrick@gmail.com', phone: '248-931-0043', address: '', archived: false },
-      { id: 'c_25', name: 'Lepage', progs: [], email: 'nl7373@hotmail.com', phone: '', address: '', archived: false },
-      { id: 'c_26', name: 'Lilien', progs: [{id: 'p_08', disc: 0}], email: '', phone: '', address: '', archived: false },
-      { id: 'c_27', name: 'Lucas', progs: [], email: 'kaylamfrick@gmail.com', phone: '248-931-0043', address: '', archived: false },
-      { id: 'c_28', name: 'Jacobs', progs: [], email: '', phone: '', address: '', archived: false },
-      { id: 'c_29', name: 'Marcil', progs: [{id: 'p_02', disc: 0}], email: '', phone: '', address: '', archived: false },
-      { id: 'c_30', name: 'Martin', progs: [{id: 'p_06', disc: 0}], email: '', phone: '', address: '', archived: false },
-      { id: 'c_31', name: 'Manville', progs: [{id: 'p_02', disc: 0}], email: '', phone: '', address: '', archived: false },
-      { id: 'c_32', name: 'Mencio', progs: [{id: 'p_05', disc: 0}], email: '', phone: '', address: '', archived: false },
-      { id: 'c_33', name: 'Miller', progs: [{id: 'p_02', disc: 0}], email: '', phone: '', address: '', archived: false },
-      { id: 'c_34', name: 'Perone', progs: [{id: 'p_01', disc: 0}], email: '', phone: '', address: '', archived: false },
-      { id: 'c_35', name: 'Pilatti / Park', progs: [{id: 'p_05', disc: 10}, {id: 'p_14', disc: 0}], email: 'jpilatti@pabst.com', phone: '', address: '', archived: false },
-      { id: 'c_36', name: 'Quinones / Cordero', progs: [{id: 'p_08', disc: 0}], email: '', phone: '', address: '', archived: false },
-      { id: 'c_37', name: 'Rinaldi', progs: [{id: 'p_01', disc: 0}], email: '', phone: '', address: '', archived: false },
-      { id: 'c_38', name: 'Rokas', progs: [{id: 'p_08', disc: 0}], email: '', phone: '', address: '', archived: false },
-      { id: 'c_39', name: 'Ryan / Scheyd', progs: [{id: 'p_08', disc: 0}], email: '', phone: '', address: '', archived: false },
-      { id: 'c_40', name: 'Taneer / Saleem / Haroon', progs: [{id: 'p_01', disc: 0}, {id: 'p_16', disc: 10}], email: '', phone: '', address: '', archived: false },
-      { id: 'c_41', name: 'Velodota', progs: [{id: 'p_16', disc: 0}], email: '', phone: '', address: '', archived: false },
-      { id: 'c_42', name: 'Howe', progs: [], email: '', phone: '', address: '', archived: false }
-    ];
-
-    fbSet(ref(db, 'bb_payments_system/pt_programs_v7'), masterPrograms);
-    fbSet(ref(db, 'bb_payments_system/pt_charges_v7'), masterCharges);
-    fbSet(ref(db, 'bb_payments_system/pt_customers_v7'), masterCustomers);
-    fbSet(ref(db, 'bb_payments_system/pt_txns_v7'), []);
+    console.log("Waiting for data...");
   }
 });
 
@@ -581,7 +504,6 @@ function renderCustomerDetail() {
         <tbody>
           ${txns.length === 0 ? '<tr><td colspan="4" style="text-align:center; color:var(--muted); padding: 40px;">No transaction history yet.</td></tr>' : ''}
           ${txns.map(t => {
-            // NEW LINKED PAYMENT UI LOGIC
             let extraBadge = '';
             let linkedNote = '';
             
@@ -790,7 +712,6 @@ function renderModal() {
     const activeBal = getCustomerBalance(activeCust.id);
     const allTxns = DB.getTxns();
     
-    // Find all charges for this customer that don't have a corresponding linked payment
     const unpaidCharges = allTxns.filter(t => 
       t.custId === activeCust.id && 
       t.type === 'charge' && 
@@ -846,7 +767,6 @@ function bindEvents() {
     rateSelect.onchange = () => updateChargeDesc();
   }
 
-  // Auto-fill payment amount when an unpaid charge is selected
   const linkSelect = document.getElementById('m-linked-charge');
   if(linkSelect) {
     linkSelect.onchange = (e) => {
