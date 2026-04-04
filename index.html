@@ -135,6 +135,7 @@ let dbCache = {
   pt_txns_v6: []
 };
 
+// ⚠️ We use a highly specific root node "bb_payments_system" to ensure 0 overlap with your TimeClock
 const DB = {
   getPrograms() { return dbCache.pt_programs_v6 || []; },
   getCharges() { return dbCache.pt_charges_v6 || []; },
@@ -163,11 +164,10 @@ function getCustomerBalance(custId) {
     .reduce((sum, t) => sum + (t.type === 'charge' ? t.amount : -t.amount), 0);
 }
 
-// --- CLOUD SYNC & HARDCODED BOOTSTRAP (THE FIX!) ---
+// --- CLOUD SYNC & HARDCODED BOOTSTRAP ---
 onValue(ref(db, 'bb_payments_system'), (snapshot) => {
   const data = snapshot.val();
   
-  // If data exists AND it has customers, load it. Otherwise, force the hardcoded master lists.
   if (data && data.pt_customers_v6 && data.pt_customers_v6.length > 0) {
     dbCache = { ...dbCache, ...data };
     render(); 
@@ -204,55 +204,54 @@ onValue(ref(db, 'bb_payments_system'), (snapshot) => {
     ];
 
     const masterCustomers = [
-      { id: 'c_01', name: 'Beringer', progs: [{id: 'p_11', disc: 0}], email: '', phone: '', address: '' },
-      { id: 'c_02', name: 'Cartier / Weber', progs: [{id: 'p_19', disc: 0}], email: '', phone: '', address: '' },
-      { id: 'c_03', name: 'Blain', progs: [{id: 'p_01', disc: 0}], email: '', phone: '', address: '' },
-      { id: 'c_04', name: 'Boehning', progs: [{id: 'p_08', disc: 0}], email: '', phone: '', address: '' },
-      { id: 'c_05', name: 'Boudreau', progs: [{id: 'p_06', disc: 0}], email: '', phone: '', address: '' },
-      { id: 'c_06', name: 'Bourlogiannis', progs: [{id: 'p_06', disc: 10}, {id: 'p_09', disc: 0}], email: '', phone: '', address: '' }, 
-      { id: 'c_07', name: 'Byron / Peters', progs: [{id: 'p_01', disc: 0}], email: '', phone: '', address: '' },
-      { id: 'c_08', name: 'Cap / Mitchell', progs: [], email: '', phone: '', address: '' },
-      { id: 'c_09', name: 'Hollywood', progs: [{id: 'p_06', disc: 0}], email: '', phone: '', address: '' },
-      { id: 'c_10', name: 'Fecteau', progs: [], email: '', phone: '', address: '' },
-      { id: 'c_11', name: 'DeGrosse', progs: [], email: '', phone: '', address: '' },
-      { id: 'c_12', name: 'Despierre', progs: [], email: '', phone: '', address: '' },
-      { id: 'c_13', name: 'Dominic', progs: [], email: '', phone: '', address: '' },
-      { id: 'c_14', name: 'Federici', progs: [{id: 'p_05', disc: 0}], email: 'acastro924@yahoo.com', phone: '', address: '' },
-      { id: 'c_15', name: 'Grasso', progs: [{id: 'p_05', disc: 0}], email: 'dlgrasso80@gmail.com', phone: '', address: '' },
-      { id: 'c_16', name: 'Gugliotti', progs: [], email: '', phone: '', address: '' },
-      { id: 'c_17', name: 'Hanewicz', progs: [{id: 'p_02', disc: 0}], email: '', phone: '', address: '' },
-      { id: 'c_18', name: 'Harlow', progs: [{id: 'p_05', disc: 0}], email: 'Kathleenharlow5@gmail.com', phone: '', address: '' },
-      { id: 'c_19', name: 'Henry', progs: [{id: 'p_08', disc: 0}], email: '', phone: '', address: '' },
-      { id: 'c_20', name: 'Husted', progs: [], email: '', phone: '', address: '' },
-      { id: 'c_21', name: 'Kane / Letis', progs: [{id: 'p_05', disc: 0}], email: '', phone: '', address: '' },
-      { id: 'c_22', name: 'Kent / Henderson / Washington', progs: [{id: 'p_10', disc: 0}], email: '', phone: '', address: '' },
-      { id: 'c_23', name: 'Kiefer', progs: [], email: '', phone: '', address: '' },
-      { id: 'c_24', name: 'Lane / Winkler', progs: [{id: 'p_05', disc: 0}], email: 'kaylamfrick@gmail.com', phone: '248-931-0043', address: '' },
-      { id: 'c_25', name: 'Lepage', progs: [], email: 'nl7373@hotmail.com', phone: '', address: '' },
-      { id: 'c_26', name: 'Lilien', progs: [{id: 'p_08', disc: 0}], email: '', phone: '', address: '' },
-      { id: 'c_27', name: 'Lucas', progs: [], email: 'kaylamfrick@gmail.com', phone: '248-931-0043', address: '' },
-      { id: 'c_28', name: 'Jacobs', progs: [], email: '', phone: '', address: '' },
-      { id: 'c_29', name: 'Marcil', progs: [{id: 'p_02', disc: 0}], email: '', phone: '', address: '' },
-      { id: 'c_30', name: 'Martin', progs: [{id: 'p_06', disc: 0}], email: '', phone: '', address: '' },
-      { id: 'c_31', name: 'Manville', progs: [{id: 'p_02', disc: 0}], email: '', phone: '', address: '' },
-      { id: 'c_32', name: 'Mencio', progs: [{id: 'p_05', disc: 0}], email: '', phone: '', address: '' },
-      { id: 'c_33', name: 'Miller', progs: [{id: 'p_02', disc: 0}], email: '', phone: '', address: '' },
-      { id: 'c_34', name: 'Perone', progs: [{id: 'p_01', disc: 0}], email: '', phone: '', address: '' },
-      { id: 'c_35', name: 'Pilatti / Park', progs: [{id: 'p_05', disc: 10}, {id: 'p_14', disc: 0}], email: 'jpilatti@pabst.com', phone: '', address: '' },
-      { id: 'c_36', name: 'Quinones / Cordero', progs: [{id: 'p_08', disc: 0}], email: '', phone: '', address: '' },
-      { id: 'c_37', name: 'Rinaldi', progs: [{id: 'p_01', disc: 0}], email: '', phone: '', address: '' },
-      { id: 'c_38', name: 'Rokas', progs: [{id: 'p_08', disc: 0}], email: '', phone: '', address: '' },
-      { id: 'c_39', name: 'Ryan / Scheyd', progs: [{id: 'p_08', disc: 0}], email: '', phone: '', address: '' },
-      { id: 'c_40', name: 'Taneer / Saleem / Haroon', progs: [{id: 'p_01', disc: 0}, {id: 'p_16', disc: 10}], email: '', phone: '', address: '' },
-      { id: 'c_41', name: 'Velodota', progs: [{id: 'p_16', disc: 0}], email: '', phone: '', address: '' },
-      { id: 'c_42', name: 'Howe', progs: [], email: '', phone: '', address: '' }
+      { id: 'c_01', name: 'Beringer', progs: [{id: 'p_11', disc: 0}], email: '', phone: '', address: '', archived: false },
+      { id: 'c_02', name: 'Cartier / Weber', progs: [{id: 'p_19', disc: 0}], email: '', phone: '', address: '', archived: false },
+      { id: 'c_03', name: 'Blain', progs: [{id: 'p_01', disc: 0}], email: '', phone: '', address: '', archived: false },
+      { id: 'c_04', name: 'Boehning', progs: [{id: 'p_08', disc: 0}], email: '', phone: '', address: '', archived: false },
+      { id: 'c_05', name: 'Boudreau', progs: [{id: 'p_06', disc: 0}], email: '', phone: '', address: '', archived: false },
+      { id: 'c_06', name: 'Bourlogiannis', progs: [{id: 'p_06', disc: 10}, {id: 'p_09', disc: 0}], email: '', phone: '', address: '', archived: false }, 
+      { id: 'c_07', name: 'Byron / Peters', progs: [{id: 'p_01', disc: 0}], email: '', phone: '', address: '', archived: false },
+      { id: 'c_08', name: 'Cap / Mitchell', progs: [], email: '', phone: '', address: '', archived: false },
+      { id: 'c_09', name: 'Hollywood', progs: [{id: 'p_06', disc: 0}], email: '', phone: '', address: '', archived: false },
+      { id: 'c_10', name: 'Fecteau', progs: [], email: '', phone: '', address: '', archived: false },
+      { id: 'c_11', name: 'DeGrosse', progs: [], email: '', phone: '', address: '', archived: false },
+      { id: 'c_12', name: 'Despierre', progs: [], email: '', phone: '', address: '', archived: false },
+      { id: 'c_13', name: 'Dominic', progs: [], email: '', phone: '', address: '', archived: false },
+      { id: 'c_14', name: 'Federici', progs: [{id: 'p_05', disc: 0}], email: 'acastro924@yahoo.com', phone: '', address: '', archived: false },
+      { id: 'c_15', name: 'Grasso', progs: [{id: 'p_05', disc: 0}], email: 'dlgrasso80@gmail.com', phone: '', address: '', archived: false },
+      { id: 'c_16', name: 'Gugliotti', progs: [], email: '', phone: '', address: '', archived: false },
+      { id: 'c_17', name: 'Hanewicz', progs: [{id: 'p_02', disc: 0}], email: '', phone: '', address: '', archived: false },
+      { id: 'c_18', name: 'Harlow', progs: [{id: 'p_05', disc: 0}], email: 'Kathleenharlow5@gmail.com', phone: '', address: '', archived: false },
+      { id: 'c_19', name: 'Henry', progs: [{id: 'p_08', disc: 0}], email: '', phone: '', address: '', archived: false },
+      { id: 'c_20', name: 'Husted', progs: [], email: '', phone: '', address: '', archived: false },
+      { id: 'c_21', name: 'Kane / Letis', progs: [{id: 'p_05', disc: 0}], email: '', phone: '', address: '', archived: false },
+      { id: 'c_22', name: 'Kent / Henderson / Washington', progs: [{id: 'p_10', disc: 0}], email: '', phone: '', address: '', archived: false },
+      { id: 'c_23', name: 'Kiefer', progs: [], email: '', phone: '', address: '', archived: false },
+      { id: 'c_24', name: 'Lane / Winkler', progs: [{id: 'p_05', disc: 0}], email: 'kaylamfrick@gmail.com', phone: '248-931-0043', address: '', archived: false },
+      { id: 'c_25', name: 'Lepage', progs: [], email: 'nl7373@hotmail.com', phone: '', address: '', archived: false },
+      { id: 'c_26', name: 'Lilien', progs: [{id: 'p_08', disc: 0}], email: '', phone: '', address: '', archived: false },
+      { id: 'c_27', name: 'Lucas', progs: [], email: 'kaylamfrick@gmail.com', phone: '248-931-0043', address: '', archived: false },
+      { id: 'c_28', name: 'Jacobs', progs: [], email: '', phone: '', address: '', archived: false },
+      { id: 'c_29', name: 'Marcil', progs: [{id: 'p_02', disc: 0}], email: '', phone: '', address: '', archived: false },
+      { id: 'c_30', name: 'Martin', progs: [{id: 'p_06', disc: 0}], email: '', phone: '', address: '', archived: false },
+      { id: 'c_31', name: 'Manville', progs: [{id: 'p_02', disc: 0}], email: '', phone: '', address: '', archived: false },
+      { id: 'c_32', name: 'Mencio', progs: [{id: 'p_05', disc: 0}], email: '', phone: '', address: '', archived: false },
+      { id: 'c_33', name: 'Miller', progs: [{id: 'p_02', disc: 0}], email: '', phone: '', address: '', archived: false },
+      { id: 'c_34', name: 'Perone', progs: [{id: 'p_01', disc: 0}], email: '', phone: '', address: '', archived: false },
+      { id: 'c_35', name: 'Pilatti / Park', progs: [{id: 'p_05', disc: 10}, {id: 'p_14', disc: 0}], email: 'jpilatti@pabst.com', phone: '', address: '', archived: false },
+      { id: 'c_36', name: 'Quinones / Cordero', progs: [{id: 'p_08', disc: 0}], email: '', phone: '', address: '', archived: false },
+      { id: 'c_37', name: 'Rinaldi', progs: [{id: 'p_01', disc: 0}], email: '', phone: '', address: '', archived: false },
+      { id: 'c_38', name: 'Rokas', progs: [{id: 'p_08', disc: 0}], email: '', phone: '', address: '', archived: false },
+      { id: 'c_39', name: 'Ryan / Scheyd', progs: [{id: 'p_08', disc: 0}], email: '', phone: '', address: '', archived: false },
+      { id: 'c_40', name: 'Taneer / Saleem / Haroon', progs: [{id: 'p_01', disc: 0}, {id: 'p_16', disc: 10}], email: '', phone: '', address: '', archived: false },
+      { id: 'c_41', name: 'Velodota', progs: [{id: 'p_16', disc: 0}], email: '', phone: '', address: '', archived: false },
+      { id: 'c_42', name: 'Howe', progs: [], email: '', phone: '', address: '', archived: false }
     ];
 
     fbSet(ref(db, 'bb_payments_system/pt_programs_v6'), masterPrograms);
     fbSet(ref(db, 'bb_payments_system/pt_charges_v6'), masterCharges);
     fbSet(ref(db, 'bb_payments_system/pt_customers_v6'), masterCustomers);
     
-    // We leave Txns as an empty array or pull from localStorage if it exists
     const localTxns = JSON.parse(localStorage.getItem('pt_txns_v6')) || [];
     fbSet(ref(db, 'bb_payments_system/pt_txns_v6'), localTxns);
   }
@@ -319,18 +318,22 @@ function render() {
 }
 
 function renderDashboard() {
-  const customers = DB.getCustomers();
+  const allCustomers = DB.getCustomers();
   const programs = DB.getPrograms();
   const txns = DB.getTxns();
 
+  // SPLIT ACTIVE VS ARCHIVED
+  const activeCusts = allCustomers.filter(c => !c.archived);
+  const archivedCusts = allCustomers.filter(c => c.archived);
+
   let totalOwed = 0, totalCollected = 0;
-  customers.forEach(c => { const bal = getCustomerBalance(c.id); if (bal > 0) totalOwed += bal; });
+  activeCusts.forEach(c => { const bal = getCustomerBalance(c.id); if (bal > 0) totalOwed += bal; });
   txns.forEach(t => { if (t.type === 'payment') totalCollected += t.amount; });
 
   return `
     <div class="stats-grid">
       <div class="card" style="background: var(--rd-lt); border-color: rgba(232,83,78,.25)">
-        <div class="stat-label">Total Outstanding</div>
+        <div class="stat-label">Active Outstanding</div>
         <div class="stat-value val-owed">$${fmtH(totalOwed)}</div>
       </div>
       <div class="card" style="background: var(--gn-lt); border-color: rgba(85,184,110,.25)">
@@ -339,7 +342,7 @@ function renderDashboard() {
       </div>
       <div class="card" style="background: var(--bl-lt); border-color: rgba(59,189,224,.25)">
         <div class="stat-label">Active Families</div>
-        <div class="stat-value" style="color: var(--bl-dk)">${customers.length}</div>
+        <div class="stat-value" style="color: var(--bl-dk)">${activeCusts.length}</div>
       </div>
     </div>
 
@@ -348,8 +351,8 @@ function renderDashboard() {
       <table class="data-table">
         <thead><tr><th>Family Name</th><th>Assigned Programs</th><th>Combined Rate</th><th>Current Balance</th></tr></thead>
         <tbody>
-          ${customers.length === 0 ? `<tr><td colspan="4" style="text-align:center; color:var(--muted); padding: 40px;">No customers yet.</td></tr>` : ''}
-          ${customers.map(c => {
+          ${activeCusts.length === 0 ? `<tr><td colspan="4" style="text-align:center; color:var(--muted); padding: 40px;">No active customers.</td></tr>` : ''}
+          ${activeCusts.map(c => {
             const custProgs = (c.progs || []).map(cp => {
               const p = programs.find(x => x.id === cp.id);
               return p ? { ...p, disc: cp.disc } : null;
@@ -386,6 +389,51 @@ function renderDashboard() {
         </tbody>
       </table>
     </div>
+
+    ${archivedCusts.length > 0 ? `
+      <h3 style="margin-top: 48px; margin-bottom: 16px; font-size: 18px; font-weight: 800; color: var(--text2);">Archived / Inactive Families</h3>
+      <div class="table-wrap" style="opacity: 0.7;">
+        <table class="data-table">
+          <thead><tr><th>Family Name</th><th>Assigned Programs</th><th>Combined Rate</th><th>Current Balance</th></tr></thead>
+          <tbody>
+            ${archivedCusts.map(c => {
+              const custProgs = (c.progs || []).map(cp => {
+                const p = programs.find(x => x.id === cp.id);
+                return p ? { ...p, disc: cp.disc } : null;
+              }).filter(Boolean);
+              
+              const bal = getCustomerBalance(c.id);
+              
+              const progBadges = custProgs.length > 0 
+                ? custProgs.map(p => `
+                    <div class="badge" style="background:var(--surface2); color:var(--text2); margin-bottom:4px;">
+                      ${p.name} ${p.disc ? '<span style="color:var(--pk-dk); margin-left:4px">(Discounted)</span>' : ''}
+                    </div>
+                  `).join('<br>')
+                : '<span style="color:var(--muted)">Unassigned</span>';
+
+              const weeklyRate = custProgs.filter(p => p.freq === 'weekly').reduce((s, p) => s + (p.rate * (1 - p.disc/100)), 0);
+              const monthlyRate = custProgs.filter(p => p.freq === 'monthly').reduce((s, p) => s + (p.rate * (1 - p.disc/100)), 0);
+              let rateTexts = [];
+              if (weeklyRate > 0) rateTexts.push(`$${fmtH(weeklyRate)} / wk`);
+              if (monthlyRate > 0) rateTexts.push(`$${fmtH(monthlyRate)} / mo`);
+              const rateDisplay = rateTexts.length > 0 ? rateTexts.join('<br>') : '—';
+
+              return `
+                <tr class="row-clickable" data-a="sel-cust" data-cust="${c.id}">
+                  <td style="font-weight: 800; color: var(--text2)">${c.name}</td>
+                  <td>${progBadges}</td>
+                  <td class="col-mono" style="font-size: 14px; color: var(--text2); line-height: 1.5;">${rateDisplay}</td>
+                  <td class="col-mono ${bal > 0 ? 'val-owed' : bal < 0 ? 'val-collected' : ''}">
+                    ${bal > 0 ? '$'+fmtH(bal) : bal === 0 ? 'Paid' : '+$'+fmtH(Math.abs(bal))}
+                  </td>
+                </tr>
+              `;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+    ` : ''}
   `;
 }
 
@@ -463,6 +511,7 @@ function renderCustomerDetail() {
       <div>
         <div class="detail-title">
           ${activeCust.name}
+          ${activeCust.archived ? '<span class="badge badge-rd" style="font-size: 12px;">Archived</span>' : ''}
           <button class="btn btn-g btn-sm" style="font-weight: 700; color:var(--muted);" data-a="open-modal" data-m="edit-customer">✏️ Edit Info</button>
         </div>
         
@@ -472,7 +521,7 @@ function renderCustomerDetail() {
           <div class="contact-item">📍 ${activeCust.address || '<span style="color:var(--border)">No Address</span>'}</div>
         </div>
         
-        <div class="assign-box">
+        <div class="assign-box" style="${activeCust.archived ? 'opacity: 0.6; pointer-events: none;' : ''}">
           <label style="margin-bottom: 10px; font-size: 14px;">Assigned Programs</label>
           
           <div style="display:flex; flex-direction:column; gap:8px; margin-bottom: 12px; max-height: 280px; overflow-y: auto; padding-right: 4px;">
@@ -581,7 +630,7 @@ function renderModal() {
 
   if (S.showModal === 'add-customer' || S.showModal === 'edit-customer') {
     const isEdit = S.showModal === 'edit-customer';
-    const cust = isEdit ? activeCust : { name: '', email: '', phone: '', address: '' };
+    const cust = isEdit ? activeCust : { name: '', email: '', phone: '', address: '', archived: false };
     
     return `
       <div class="modal-overlay">
@@ -613,6 +662,19 @@ function renderModal() {
             <button class="btn btn-b btn-full" data-a="save-customer" data-edit="${isEdit}">${isEdit ? 'Save Changes' : 'Create Family'}</button>
             <button class="btn btn-g btn-full" data-a="close-modal">Cancel</button>
           </div>
+
+          ${isEdit ? `
+            <div style="margin-top: 24px; border-top: 1.5px solid var(--border); padding-top: 24px;">
+              <button class="btn ${cust.archived ? 'btn-g' : 'btn-rd'} btn-full" data-a="archive-customer">
+                ${cust.archived ? 'Restore Family to Active Status' : 'Archive / Deactivate Family'}
+              </button>
+              ${cust.archived ? `
+              <button class="btn btn-rd btn-full" data-a="delete-customer" style="margin-top: 12px;">
+                Delete Family Permanently
+              </button>
+              ` : ''}
+            </div>
+          ` : ''}
         </div>
       </div>
     `;
@@ -810,9 +872,36 @@ function bindEvents() {
           }
         } else {
           const newId = 'c_' + genId();
-          customers.push({ id: newId, name, email, phone, address, progs: [] });
+          customers.push({ id: newId, name, email, phone, address, progs: [], archived: false });
           DB.set('pt_customers_v6', customers);
           set({ showModal: null, view: 'customer', selCustId: newId, draftPrograms: [] });
+        }
+      }
+
+      if (action === 'archive-customer') {
+        if(confirm("Are you sure you want to change this family's active status?")) {
+          const customers = DB.getCustomers();
+          const idx = customers.findIndex(c => c.id === S.selCustId);
+          if (idx > -1) {
+            customers[idx].archived = !customers[idx].archived;
+            DB.set('pt_customers_v6', customers);
+            set({ showModal: null, view: 'dashboard', selCustId: null });
+          }
+        }
+      }
+
+      // THE NEW DELETE LOGIC
+      if (action === 'delete-customer') {
+        if(confirm("Are you absolutely sure you want to permanently delete this family? This cannot be undone and their payment history will be deleted.")) {
+          // Remove the customer
+          const customers = DB.getCustomers().filter(c => c.id !== S.selCustId);
+          DB.set('pt_customers_v6', customers);
+          
+          // Clean up their transactions so they don't float around invisibly
+          const txns = DB.getTxns().filter(t => t.custId !== S.selCustId);
+          DB.set('pt_txns_v6', txns);
+          
+          set({ showModal: null, view: 'dashboard', selCustId: null });
         }
       }
 
