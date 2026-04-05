@@ -969,7 +969,7 @@ function bindEvents() {
                 }
               </style>
             </head>
-            <body>
+            <body onload="window.print()">
               <div class="header">
                 <h1>Bright Beginnings</h1>
                 <p>Childcare Tax Statement for Calendar Year ${year}</p>
@@ -1001,10 +1001,6 @@ function bindEvents() {
                 <p><strong>Tax ID / EIN:</strong> XX-XXXXXXX</p>
                 <p><strong>Address:</strong> [Your Business Address]</p>
               </div>
-              
-              <script>
-                window.onload = function() { window.print(); }
-              </script>
             </body>
           </html>
         `);
@@ -1022,7 +1018,6 @@ function bindEvents() {
 
         const cust = DB.getCustomers().find(c => c.id === custId);
         
-        // Ensure transactions are chronologically sorted
         const allCustTxns = DB.getTxns()
           .filter(t => t.custId === custId)
           .sort((a,b) => new Date(a.date) - new Date(b.date));
@@ -1078,7 +1073,7 @@ function bindEvents() {
                 }
               </style>
             </head>
-            <body>
+            <body onload="window.print()">
               <div class="header">
                 <h1>Bright Beginnings</h1>
                 <p>Account Statement</p>
@@ -1154,10 +1149,6 @@ function bindEvents() {
                 <p><strong>Address:</strong> [Your Business Address]</p>
                 <p>Please make checks payable to Bright Beginnings or submit payment via Zelle/Venmo.</p>
               </div>
-              
-              <script>
-                window.onload = function() { window.print(); }
-              </script>
             </body>
           </html>
         `);
@@ -1207,115 +1198,4 @@ function bindEvents() {
 
       if (action === 'delete-customer') {
         if(confirm("Are you absolutely sure you want to permanently delete this family? This cannot be undone and their payment history will be deleted.")) {
-          const customers = DB.getCustomers().filter(c => c.id !== S.selCustId);
-          DB.set('pt_customers_v7', customers);
-          
-          const txns = DB.getTxns().filter(t => t.custId !== S.selCustId);
-          DB.set('pt_txns_v7', txns);
-          
-          set({ showModal: null, view: 'dashboard', selCustId: null });
-        }
-      }
-
-      if (action === 'save-program') {
-        const name = document.getElementById('m-prog-name').value.trim();
-        const rate = parseFloat(document.getElementById('m-prog-rate').value);
-        const freq = document.getElementById('m-prog-freq').value;
-        if (!name || isNaN(rate)) return;
-        
-        const programs = DB.getPrograms();
-        if (S.tempId) {
-          const idx = programs.findIndex(p => p.id === S.tempId);
-          if (idx > -1) {
-            programs[idx].name = name;
-            programs[idx].rate = rate;
-            programs[idx].freq = freq;
-          }
-        } else {
-          programs.push({ id: 'p_' + genId(), name, rate, freq });
-        }
-        
-        DB.set('pt_programs_v7', programs);
-        set({ showModal: null, tempId: null });
-      }
-
-      if (action === 'delete-program') {
-        if(confirm("Are you sure you want to delete this program?")) {
-          const programs = DB.getPrograms().filter(p => p.id !== S.tempId);
-          DB.set('pt_programs_v7', programs);
-          
-          const customers = DB.getCustomers().map(c => {
-            if (c.progs) c.progs = c.progs.filter(dp => dp.id !== S.tempId);
-            return c;
-          });
-          DB.set('pt_customers_v7', customers);
-          
-          set({ showModal: null, tempId: null });
-        }
-      }
-
-      if (action === 'save-charge') {
-        const name = document.getElementById('m-charge-name').value.trim();
-        const amount = parseFloat(document.getElementById('m-charge-amt').value);
-        if (!name || isNaN(amount)) return;
-        
-        const charges = DB.getCharges();
-        if (S.tempId) {
-          const idx = charges.findIndex(c => c.id === S.tempId);
-          if (idx > -1) {
-            charges[idx].name = name;
-            charges[idx].amount = amount;
-          }
-        } else {
-          charges.push({ id: 'ch_' + genId(), name, amount });
-        }
-        
-        DB.set('pt_charges_v7', charges);
-        set({ showModal: null, tempId: null });
-      }
-
-      if (action === 'delete-charge') {
-        if(confirm("Are you sure you want to delete this standard charge?")) {
-          const charges = DB.getCharges().filter(c => c.id !== S.tempId);
-          DB.set('pt_charges_v7', charges);
-          set({ showModal: null, tempId: null });
-        }
-      }
-
-      if (action === 'save-tx') {
-        const type = btn.getAttribute('data-type');
-        const amount = parseFloat(document.getElementById('m-amt').value);
-        const date = document.getElementById('m-date').value;
-        const desc = document.getElementById('m-note').value.trim();
-        if (isNaN(amount) || !date) return;
-
-        let linkedToId = null;
-        if (type === 'payment') {
-          const linkedSelect = document.getElementById('m-linked-charge');
-          if (linkedSelect && linkedSelect.value) {
-            linkedToId = linkedSelect.value;
-          }
-        }
-
-        const txns = DB.getTxns();
-        txns.push({ 
-          id: 'tx_' + genId(), 
-          custId: S.selCustId, 
-          type, 
-          amount, 
-          date, 
-          note: desc || (type === 'charge' ? 'Manual Charge' : 'Payment'),
-          linkedToId: linkedToId 
-        });
-        
-        DB.set('pt_txns_v7', txns);
-        set({ showModal: null });
-      }
-    };
-  });
-}
-
-render();
-</script>
-</body>
-</html>
+          const customers
