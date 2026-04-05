@@ -128,7 +128,6 @@ function getNextMonday() { const d = new Date(now); d.setDate(d.getDate() + ((1 
 function getNextMonth() { const d = new Date(now); d.setMonth(d.getMonth() + 1); return d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }); }
 
 // --- DATABASE & CLOUD STATE ---
-// Using v7 for linked payments and archive logic
 let dbCache = {
   pt_programs_v7: [],
   pt_charges_v7: [],
@@ -136,7 +135,6 @@ let dbCache = {
   pt_txns_v7: []
 };
 
-// ⚠️ We use a highly specific root node "bb_payments_system" to ensure 0 overlap with your TimeClock
 const DB = {
   getPrograms() { return dbCache.pt_programs_v7 || []; },
   getCharges() { return dbCache.pt_charges_v7 || []; },
@@ -153,7 +151,8 @@ let S = {
   selCustId: null, 
   showModal: null,
   tempId: null,
-  draftPrograms: [] 
+  draftPrograms: [],
+  reportYear: new Date().getFullYear().toString()
 };
 
 function set(patch) { Object.assign(S, patch); render(); }
@@ -166,7 +165,6 @@ function getCustomerBalance(custId) {
 }
 
 // --- CLOUD SYNC ---
-// Clean listener without any hardcoded overrides.
 onValue(ref(db, 'bb_payments_system'), (snapshot) => {
   const data = snapshot.val();
   
@@ -197,6 +195,9 @@ function render() {
   } else if (S.view === 'customer') {
     mainContentHtml = renderCustomerDetail();
     viewTitle = 'Family Ledger';
+  } else if (S.view === 'reports') {
+    mainContentHtml = renderReports();
+    viewTitle = 'Reports & Tax Forms';
   }
 
   app.innerHTML = `
@@ -213,6 +214,9 @@ function render() {
         </div>
         <div class="nav-item ${S.view === 'charges' ? 'active' : ''}" data-a="nav" data-view="charges">
           💸 Standard Charges
+        </div>
+        <div class="nav-item ${S.view === 'reports' ? 'active' : ''}" data-a="nav" data-view="reports">
+          🖨️ Reports & Taxes
         </div>
         <div style="height: 1.5px; background: var(--border); margin: 8px 0"></div>
         <div class="nav-item" data-a="open-modal" data-m="add-customer">
@@ -408,6 +412,109 @@ function renderCharges() {
           `).join('')}
         </tbody>
       </table>
+    </div>
+  `;
+}
+
+function renderReports() {
+  const customers = DB.getCustomers();
+  const txns = DB.getTxns();
+
+  // Basic Revenue Calc for the selected year
+  let totalRevenue = 0;
+  txns.forEach(t => {
+    if (t.type === 'payment' && t.date.startsWith(S.reportYear)) {
+      totalRevenue += t.amount;
+    }
+  });
+
+  const firstDayOfThisMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+  const todayStr = now.toISOString().split('T')[0];
+
+  return `
+    <div style="display:flex; gap:32px; flex-wrap: wrap;">
+      
+      <div style="flex: 1; min-width: 320px; display: flex; flex-direction: column; gap: 32px;">
+        
+        <div class="card" style="border: 1.5px solid var(--border);">
+          <h3 style="margin-bottom: 16px; font-size: 18px; font-weight: 800;">Revenue Report</h3>
+          <div class="field">
+            <label>Reporting Year</label>
+            <select id="report-year-select" data-a="change-report-year">
+              <option value="2026" ${S.reportYear === '2026' ? 'selected' : ''}>2026</option>
+              <option value="2025" ${S.reportYear === '2025' ? 'selected' : ''}>2025</option>
+              <option value="2024" ${S.reportYear === '2024' ? 'selected' : ''}>2024</option>
+            </select>
+          </div>
+          <div style="margin-top: 24px; padding: 20px; background: var(--gn-lt); border-radius: var(--r); border: 1.5px solid rgba(85,184,110,.25);">
+            <div class="stat-label">Total Processed Payments (${S.reportYear})</div>
+            <div class="stat-value val-collected">$${fmtH(totalRevenue)}</div>
+          </div>
+        </div>
+
+        <div class="card" style="border: 1.5px solid var(--border); background: var(--surface2)">
+          <h3 style="margin-bottom: 8px; font-size: 18px; font-weight: 800;">Year-End Tax Statement</h3>
+          <p style="font-size: 13px; color: var(--text2); margin-bottom: 20px; font-weight: 600;">
+            Generate a formal, printable PDF equivalent statement detailing a family's total payments for the calendar year.
+          </p>
+          
+          <div class="field">
+            <label>Select Family</label>
+            <select id="tax-cust-select">
+              <option value="">-- Choose a Family --</option>
+              ${customers.map(c => `<option value="${c.id}">${c.name}</option>`).join('')}
+            </select>
+          </div>
+          
+          <div class="field">
+            <label>Tax Year</label>
+            <select id="tax-year-select">
+              <option value="2026">2026</option>
+              <option value="2025" selected>2025</option>
+              <option value="2024">2024</option>
+            </select>
+          </div>
+
+          <button class="btn btn-pk btn-full" style="margin-top: 16px;" data-a="generate-tax">
+            🖨️ Create Tax Statement
+          </button>
+        </div>
+
+      </div>
+
+      <div style="flex: 1; min-width: 320px;">
+        
+        <div class="card" style="border: 1.5px solid var(--border); background: var(--surface2)">
+          <h3 style="margin-bottom: 8px; font-size: 18px; font-weight: 800;">Custom Account Statement</h3>
+          <p style="font-size: 13px; color: var(--text2); margin-bottom: 20px; font-weight: 600;">
+            Generate a detailed ledger for a specific date range. It automatically calculates the starting balance and itemizes all charges and payments within the window.
+          </p>
+          
+          <div class="field">
+            <label>Select Family</label>
+            <select id="stmt-cust-select">
+              <option value="">-- Choose a Family --</option>
+              ${customers.map(c => `<option value="${c.id}">${c.name}</option>`).join('')}
+            </select>
+          </div>
+          
+          <div style="display:flex; gap:12px;">
+            <div class="field" style="flex:1;">
+              <label>Start Date</label>
+              <input type="date" id="stmt-start-date" value="${firstDayOfThisMonth}">
+            </div>
+            <div class="field" style="flex:1;">
+              <label>End Date</label>
+              <input type="date" id="stmt-end-date" value="${todayStr}">
+            </div>
+          </div>
+
+          <button class="btn btn-b btn-full" style="margin-top: 16px;" data-a="generate-statement">
+            🖨️ Create Detailed Statement
+          </button>
+        </div>
+
+      </div>
     </div>
   `;
 }
@@ -778,6 +885,13 @@ function bindEvents() {
     };
   }
 
+  const reportYearSelect = document.getElementById('report-year-select');
+  if(reportYearSelect) {
+    reportYearSelect.onchange = (e) => {
+      set({ reportYear: e.target.value });
+    };
+  }
+
   document.querySelectorAll('[data-a]').forEach(btn => {
     btn.onclick = () => {
       const action = btn.getAttribute('data-a');
@@ -819,6 +933,236 @@ function bindEvents() {
 
       if (action === 'edit-prog') set({ showModal: 'edit-program', tempId: btn.getAttribute('data-id') });
       if (action === 'edit-charge') set({ showModal: 'edit-charge', tempId: btn.getAttribute('data-id') });
+
+      // TAX STATEMENT GENERATOR LOGIC
+      if (action === 'generate-tax') {
+        const custId = document.getElementById('tax-cust-select').value;
+        const year = document.getElementById('tax-year-select').value;
+        if (!custId) return alert("Please select a family first.");
+
+        const cust = DB.getCustomers().find(c => c.id === custId);
+        const payments = DB.getTxns().filter(t => 
+           t.custId === custId && 
+           t.type === 'payment' && 
+           t.date.startsWith(year)
+        );
+        const totalPaid = payments.reduce((sum, t) => sum + t.amount, 0);
+
+        const printWindow = window.open('', '_blank');
+        printWindow.document.write(`
+          <html>
+            <head>
+              <title>Tax Statement - ${cust.name}</title>
+              <style>
+                body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; padding: 40px; color: #333; line-height: 1.6; max-width: 800px; margin: 0 auto; }
+                .header { text-align: center; margin-bottom: 50px; border-bottom: 2px solid #1a8fb0; padding-bottom: 20px; }
+                .header h1 { margin: 0; color: #1a8fb0; font-size: 28px; }
+                .header p { margin: 5px 0 0 0; font-size: 14px; color: #666; }
+                .details { margin-bottom: 40px; display: flex; justify-content: space-between; }
+                .details p { margin: 4px 0; }
+                .statement-box { margin: 40px 0; padding: 24px; background: #f9f9f9; border: 1px solid #ccc; text-align: center; }
+                .total { font-size: 28px; font-weight: bold; color: #28304a; margin-top: 10px; }
+                .footer { margin-top: 60px; font-size: 13px; color: #666; text-align: center; }
+                @media print {
+                  body { padding: 0; max-width: 100%; }
+                  .statement-box { background: white; border: 2px solid #000; }
+                }
+              </style>
+            </head>
+            <body>
+              <div class="header">
+                <h1>Bright Beginnings</h1>
+                <p>Childcare Tax Statement for Calendar Year ${year}</p>
+              </div>
+              
+              <div class="details">
+                <div>
+                  <strong>Prepared For:</strong><br>
+                  ${cust.name} Family<br>
+                  ${cust.address || 'Address on File'}
+                </div>
+                <div style="text-align: right;">
+                  <strong>Date Issued:</strong><br>
+                  ${new Date().toLocaleDateString()}
+                </div>
+              </div>
+              
+              <p>This document serves as an official statement of childcare payments received by Bright Beginnings for the calendar year ${year}. These payments were made for dependent care services provided at our facility.</p>
+              
+              <div class="statement-box">
+                <div>Total Payments Received in ${year}</div>
+                <div class="total">$${fmtH(totalPaid)}</div>
+              </div>
+              
+              <p style="font-size: 14px;">If you have any questions regarding these payments or require a detailed breakdown of individual weekly charges, please contact administration.</p>
+              
+              <div class="footer">
+                <p><strong>Provider:</strong> Bright Beginnings Daycare</p>
+                <p><strong>Tax ID / EIN:</strong> XX-XXXXXXX</p>
+                <p><strong>Address:</strong> [Your Business Address]</p>
+              </div>
+              
+              <script>
+                window.onload = function() { window.print(); }
+              </script>
+            </body>
+          </html>
+        `);
+        printWindow.document.close();
+      }
+
+      // ACCOUNT STATEMENT (CUSTOM DATE RANGE)
+      if (action === 'generate-statement') {
+        const custId = document.getElementById('stmt-cust-select').value;
+        const startDate = document.getElementById('stmt-start-date').value;
+        const endDate = document.getElementById('stmt-end-date').value;
+        
+        if (!custId || !startDate || !endDate) return alert("Please select a family and complete the date range.");
+        if (startDate > endDate) return alert("The Start Date cannot be after the End Date.");
+
+        const cust = DB.getCustomers().find(c => c.id === custId);
+        
+        // Ensure transactions are chronologically sorted
+        const allCustTxns = DB.getTxns()
+          .filter(t => t.custId === custId)
+          .sort((a,b) => new Date(a.date) - new Date(b.date));
+        
+        let startingBalance = 0;
+        let rangeTxns = [];
+        
+        allCustTxns.forEach(t => {
+          if (t.date < startDate) {
+            startingBalance += (t.type === 'charge' ? t.amount : -t.amount);
+          } else if (t.date >= startDate && t.date <= endDate) {
+            rangeTxns.push(t);
+          }
+        });
+        
+        let endingBalance = startingBalance;
+        let totalCharges = 0;
+        let totalPayments = 0;
+
+        rangeTxns.forEach(t => {
+           if (t.type === 'charge') {
+              endingBalance += t.amount;
+              totalCharges += t.amount;
+           } else {
+              endingBalance -= t.amount;
+              totalPayments += t.amount;
+           }
+        });
+
+        const printWindow = window.open('', '_blank');
+        printWindow.document.write(`
+          <html>
+            <head>
+              <title>Account Statement - ${cust.name}</title>
+              <style>
+                body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; padding: 40px; color: #333; line-height: 1.6; max-width: 800px; margin: 0 auto; }
+                .header { text-align: center; margin-bottom: 40px; border-bottom: 2px solid #3bbde0; padding-bottom: 20px; }
+                .header h1 { margin: 0; color: #3bbde0; font-size: 28px; }
+                .header p { margin: 5px 0 0 0; font-size: 14px; color: #666; }
+                .details { margin-bottom: 30px; display: flex; justify-content: space-between; }
+                .details p { margin: 4px 0; }
+                table { width: 100%; border-collapse: collapse; margin-bottom: 30px; font-size: 14px; }
+                th { background: #f0f4fa; padding: 12px; text-align: left; border-bottom: 2px solid #ccc; color: #5a618a; }
+                td { padding: 12px; border-bottom: 1px solid #eee; }
+                .amt-charge { color: #b02020; }
+                .amt-payment { color: #2e7d42; }
+                .totals-box { width: 300px; margin-left: auto; background: #f9f9f9; border: 1px solid #ccc; padding: 20px; }
+                .totals-row { display: flex; justify-content: space-between; margin-bottom: 8px; }
+                .totals-row.final { font-weight: bold; font-size: 18px; margin-top: 12px; padding-top: 12px; border-top: 2px solid #ccc; }
+                .footer { margin-top: 60px; font-size: 13px; color: #666; text-align: center; }
+                @media print {
+                  body { padding: 0; max-width: 100%; }
+                }
+              </style>
+            </head>
+            <body>
+              <div class="header">
+                <h1>Bright Beginnings</h1>
+                <p>Account Statement</p>
+              </div>
+              
+              <div class="details">
+                <div>
+                  <strong>Prepared For:</strong><br>
+                  ${cust.name} Family<br>
+                  ${cust.address || 'Address on File'}
+                </div>
+                <div style="text-align: right;">
+                  <strong>Statement Period:</strong><br>
+                  ${new Date(startDate + 'T12:00:00').toLocaleDateString()} - ${new Date(endDate + 'T12:00:00').toLocaleDateString()}<br><br>
+                  <strong>Date Issued:</strong><br>
+                  ${new Date().toLocaleDateString()}
+                </div>
+              </div>
+              
+              <table>
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Description</th>
+                    <th>Charges</th>
+                    <th>Payments</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><em>${new Date(startDate + 'T12:00:00').toLocaleDateString()}</em></td>
+                    <td><em>Starting Balance</em></td>
+                    <td></td>
+                    <td style="color: #666; font-weight: bold;">
+                      ${startingBalance > 0 ? '$'+fmtH(startingBalance) + ' (Due)' : (startingBalance < 0 ? '+$'+fmtH(Math.abs(startingBalance)) + ' (Credit)' : '$0.00')}
+                    </td>
+                  </tr>
+                  ${rangeTxns.length === 0 ? '<tr><td colspan="4" style="text-align:center; padding: 20px; color: #999;">No transactions during this period.</td></tr>' : ''}
+                  ${rangeTxns.map(t => `
+                    <tr>
+                      <td>${new Date(t.date + 'T12:00:00').toLocaleDateString()}</td>
+                      <td>${t.note || (t.type === 'charge' ? 'Charge' : 'Payment')}</td>
+                      <td class="${t.type === 'charge' ? 'amt-charge' : ''}">${t.type === 'charge' ? '$'+fmtH(t.amount) : ''}</td>
+                      <td class="${t.type === 'payment' ? 'amt-payment' : ''}">${t.type === 'payment' ? '-$'+fmtH(t.amount) : ''}</td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+              
+              <div class="totals-box">
+                <div class="totals-row">
+                  <span>Starting Balance:</span>
+                  <span>${startingBalance > 0 ? '$'+fmtH(startingBalance) : (startingBalance < 0 ? '-$'+fmtH(Math.abs(startingBalance)) : '$0.00')}</span>
+                </div>
+                <div class="totals-row">
+                  <span>New Charges:</span>
+                  <span>$${fmtH(totalCharges)}</span>
+                </div>
+                <div class="totals-row" style="padding-bottom: 12px; border-bottom: 1px solid #ccc;">
+                  <span>Payments Received:</span>
+                  <span>-$${fmtH(totalPayments)}</span>
+                </div>
+                <div class="totals-row final">
+                  <span>Ending Balance:</span>
+                  <span style="color: ${endingBalance > 0 ? '#b02020' : (endingBalance < 0 ? '#2e7d42' : '#333')}">
+                    ${endingBalance > 0 ? '$'+fmtH(endingBalance) + ' Due' : (endingBalance === 0 ? 'Paid in Full' : '+$'+fmtH(Math.abs(endingBalance)) + ' Credit')}
+                  </span>
+                </div>
+              </div>
+              
+              <div class="footer">
+                <p><strong>Provider:</strong> Bright Beginnings Daycare</p>
+                <p><strong>Address:</strong> [Your Business Address]</p>
+                <p>Please make checks payable to Bright Beginnings or submit payment via Zelle/Venmo.</p>
+              </div>
+              
+              <script>
+                window.onload = function() { window.print(); }
+              </script>
+            </body>
+          </html>
+        `);
+        printWindow.document.close();
+      }
 
       if (action === 'save-customer') {
         const name = document.getElementById('m-name').value.trim();
