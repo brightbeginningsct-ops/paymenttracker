@@ -12,7 +12,7 @@
       --bg: #f4f6fb; --surface: #fff; --surface2: #f0f4fa; --border: #dce3f0;
       --yellow: #f9c522; --yw-lt: #fff8d6; --yw-dk: #9a6a00;
       --blue: #3bbde0; --bl-lt: #e0f6fc; --bl-dk: #1a8fb0;
-      --royal: #4169E1; --ry-lt: #ecf0ff; --ry-dk: #2b4491; /* Replacement for Pink */
+      --royal: #4169E1; --ry-lt: #ecf0ff; --ry-dk: #2b4491;
       --green: #55b86e; --gn-lt: #e6f5ea; --gn-dk: #2e7d42;
       --red: #e8534e; --rd-lt: #fdecea; --rd-dk: #b02020;
       --text: #28304a; --text2: #5a618a; --muted: #9aa3c5;
@@ -123,6 +123,15 @@ const db = getDatabase(app);
 // --- UTILS ---
 const genId = () => Math.random().toString(36).substr(2, 9);
 function fmtH(h) { return (h || 0).toFixed(2); }
+
+// Timezone-safe date reading
+function fmtD(str) {
+  if (!str) return '';
+  const parts = str.split('-');
+  if (parts.length !== 3) return str;
+  return parseInt(parts[1]) + '/' + parseInt(parts[2]) + '/' + parts[0];
+}
+
 const now = new Date();
 function getNextMonday() { const d = new Date(now); d.setDate(d.getDate() + ((1 + 7 - d.getDay()) % 7 || 7)); return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); }
 function getNextMonth() { const d = new Date(now); d.setMonth(d.getMonth() + 1); return d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }); }
@@ -514,13 +523,13 @@ function renderCustomerDetail() {
             } else if (t.type === 'payment' && t.linkedToId) {
                const linkedCharge = txns.find(c => c.id === t.linkedToId);
                if (linkedCharge) {
-                  linkedNote = `<br><span style="font-size:11px; color:var(--muted)">↳ Applied to ${new Date(linkedCharge.date).toLocaleDateString()} charge</span>`;
+                  linkedNote = `<br><span style="font-size:11px; color:var(--muted)">↳ Applied to ${fmtD(linkedCharge.date)} charge</span>`;
                }
             }
 
             return `
-              <tr>
-                <td class="col-mono" style="font-weight:600">${new Date(t.date).toLocaleDateString()}</td>
+              <tr class="row-clickable" data-a="edit-tx" data-id="${t.id}" data-type="${t.type}">
+                <td class="col-mono" style="font-weight:600">${fmtD(t.date)}</td>
                 <td><span class="badge badge-${t.type === 'payment' ? 'gn' : 'royal'}">${t.type === 'payment' ? 'Payment' : 'Charge'}</span>${extraBadge}</td>
                 <td style="color:var(--text); font-weight:600">${t.note}${linkedNote}</td>
                 <td class="col-mono ${t.type === 'payment' ? 'val-collected' : 'val-owed'}">
@@ -664,7 +673,13 @@ function renderModal() {
   }
 
   if (S.showModal === 'add-charge') {
-    const custProgs = (activeCust.progs || []).map(cp => {
+    const isEdit = !!S.tempId;
+    const tx = isEdit ? DB.getTxns().find(t => t.id === S.tempId) : null;
+    const defDate = tx ? tx.date : now.toISOString().split('T')[0];
+    const defAmt = tx ? tx.amount : '';
+    const defNote = tx ? tx.note : '';
+
+    const cProgs = (activeCust.progs || []).map(cp => {
       const p = programs.find(x => x.id === cp.id);
       return p ? { ...p, disc: cp.disc } : null;
     }).filter(Boolean);
@@ -672,17 +687,18 @@ function renderModal() {
     return `
       <div class="modal-overlay">
         <div class="modal">
-          <h2>Add Charge</h2>
+          <h2>${isEdit ? 'Edit Charge' : 'Add Charge'}</h2>
           <p style="font-size: 14px; font-weight: 800; color: var(--text2); margin-bottom: 20px;">Billing: <strong style="color: var(--blue)">${activeCust?.name}</strong></p>
-          <div class="field"><label>Invoice Date</label><input type="date" id="m-date" value="${now.toISOString().split('T')[0]}"></div>
+          <div class="field"><label>Invoice Date</label><input type="date" id="m-date" value="${defDate}"></div>
           
+          ${!isEdit ? `
           <div class="field">
             <label>Quick Fill</label>
             <select id="m-quick-rates" data-i="rate-select">
               <option value="">-- Custom Charge --</option>
-              ${custProgs.length > 0 ? `
+              ${cProgs.length > 0 ? `
                 <optgroup label="Family's Assigned Programs">
-                  ${custProgs.map(cp => {
+                  ${cProgs.map(cp => {
                     const finalAmt = cp.rate * (1 - cp.disc/100);
                     return `<option value="${finalAmt}" data-type="program" data-name="${cp.name}" data-freq="${cp.freq}">${cp.name} ${cp.disc ? '(Discounted)' : ''} - $${fmtH(finalAmt)}</option>`;
                   }).join('')}
@@ -693,11 +709,13 @@ function renderModal() {
               </optgroup>
             </select>
           </div>
+          ` : ''}
           
-          <div class="field"><label>Amount ($)</label><input type="number" id="m-amt" step="0.01" placeholder="0.00"></div>
-          <div class="field"><label>Description</label><input type="text" id="m-note" placeholder="e.g. Tuition"></div>
+          <div class="field"><label>Amount ($)</label><input type="number" id="m-amt" step="0.01" value="${defAmt}" placeholder="0.00"></div>
+          <div class="field"><label>Description</label><input type="text" id="m-note" value="${defNote}" placeholder="e.g. Tuition"></div>
           <div style="display:flex; gap:12px; margin-top:28px">
-            <button class="btn btn-royal btn-full" data-a="save-tx" data-type="charge">Apply Charge</button>
+            <button class="btn btn-royal btn-full" data-a="save-tx" data-type="charge">${isEdit ? 'Save Changes' : 'Apply Charge'}</button>
+            ${isEdit ? `<button class="btn btn-rd" data-a="delete-tx">Delete</button>` : ''}
             <button class="btn btn-g btn-full" data-a="close-modal">Cancel</button>
           </div>
         </div>
@@ -706,19 +724,25 @@ function renderModal() {
   }
 
   if (S.showModal === 'add-payment') {
+    const isEdit = !!S.tempId;
+    const tx = isEdit ? DB.getTxns().find(t => t.id === S.tempId) : null;
     const activeBal = getCustomerBalance(activeCust.id);
     const allTxns = DB.getTxns();
     
+    const defDate = tx ? tx.date : now.toISOString().split('T')[0];
+    const defAmt = tx ? tx.amount : (activeBal > 0 ? fmtH(activeBal) : '');
+    const defNote = tx ? tx.note : '';
+
     const unpaidCharges = allTxns.filter(t => 
       t.custId === activeCust.id && 
       t.type === 'charge' && 
-      !allTxns.some(p => p.type === 'payment' && p.linkedToId === t.id)
+      (!allTxns.some(p => p.type === 'payment' && p.linkedToId === t.id && p.id !== (tx ? tx.id : null)))
     );
 
     return `
       <div class="modal-overlay">
         <div class="modal">
-          <h2>Receive Payment</h2>
+          <h2>${isEdit ? 'Edit Payment' : 'Receive Payment'}</h2>
           <p style="font-size: 14px; font-weight: 800; color: var(--text2); margin-bottom: 20px;">Receiving from: <strong style="color: var(--blue)">${activeCust?.name}</strong></p>
           
           <div class="field">
@@ -726,18 +750,19 @@ function renderModal() {
             <select id="m-linked-charge" data-a="select-linked-charge">
               <option value="">-- General Payment (Unlinked) --</option>
               ${unpaidCharges.map(c => `
-                <option value="${c.id}" data-amt="${c.amount}">
-                  ${new Date(c.date).toLocaleDateString()} - ${c.note} ($${fmtH(c.amount)})
+                <option value="${c.id}" data-amt="${c.amount}" ${isEdit && tx.linkedToId === c.id ? 'selected' : ''}>
+                  ${fmtD(c.date)} - ${c.note} ($${fmtH(c.amount)})
                 </option>
               `).join('')}
             </select>
           </div>
 
-          <div class="field"><label>Date Received</label><input type="date" id="m-date" value="${now.toISOString().split('T')[0]}"></div>
-          <div class="field"><label>Amount Paid ($)</label><input type="number" id="m-amt" step="0.01" value="${activeBal > 0 ? fmtH(activeBal) : ''}" placeholder="0.00"></div>
-          <div class="field"><label>Payment Method / Note</label><input type="text" id="m-note" placeholder="e.g. Venmo, Check #1234"></div>
+          <div class="field"><label>Date Received</label><input type="date" id="m-date" value="${defDate}"></div>
+          <div class="field"><label>Amount Paid ($)</label><input type="number" id="m-amt" step="0.01" value="${defAmt}" placeholder="0.00"></div>
+          <div class="field"><label>Payment Method / Note</label><input type="text" id="m-note" value="${defNote}" placeholder="e.g. Venmo, Check #1234"></div>
           <div style="display:flex; gap:12px; margin-top:28px">
-            <button class="btn btn-y btn-full" data-a="save-tx" data-type="payment">Log Payment</button>
+            <button class="btn btn-y btn-full" data-a="save-tx" data-type="payment">${isEdit ? 'Save Changes' : 'Log Payment'}</button>
+            ${isEdit ? `<button class="btn btn-rd" data-a="delete-tx">Delete</button>` : ''}
             <button class="btn btn-g btn-full" data-a="close-modal">Cancel</button>
           </div>
         </div>
@@ -816,6 +841,12 @@ function bindEvents() {
 
       if (action === 'edit-prog') set({ showModal: 'edit-program', tempId: btn.getAttribute('data-id') });
       if (action === 'edit-charge') set({ showModal: 'edit-charge', tempId: btn.getAttribute('data-id') });
+      
+      if (action === 'edit-tx') {
+        const id = btn.getAttribute('data-id');
+        const type = btn.getAttribute('data-type');
+        set({ showModal: type === 'charge' ? 'add-charge' : 'add-payment', tempId: id });
+      }
 
       if (action === 'save-customer') {
         const name = document.getElementById('m-name').value.trim();
@@ -935,6 +966,14 @@ function bindEvents() {
         }
       }
 
+      if (action === 'delete-tx') {
+        if(confirm("Are you sure you want to permanently delete this transaction?")) {
+          const txns = DB.getTxns().filter(t => t.id !== S.tempId);
+          DB.set('pt_txns_v7', txns);
+          set({ showModal: null, tempId: null });
+        }
+      }
+
       if (action === 'save-tx') {
         const type = btn.getAttribute('data-type');
         const amount = parseFloat(document.getElementById('m-amt').value);
@@ -951,18 +990,28 @@ function bindEvents() {
         }
 
         const txns = DB.getTxns();
-        txns.push({ 
-          id: 'tx_' + genId(), 
-          custId: S.selCustId, 
-          type, 
-          amount, 
-          date, 
-          note: desc || (type === 'charge' ? 'Manual Charge' : 'Payment'),
-          linkedToId: linkedToId 
-        });
+        if (S.tempId) {
+          const idx = txns.findIndex(t => t.id === S.tempId);
+          if (idx > -1) {
+            txns[idx].amount = amount;
+            txns[idx].date = date;
+            txns[idx].note = desc || (type === 'charge' ? 'Manual Charge' : 'Payment');
+            txns[idx].linkedToId = linkedToId;
+          }
+        } else {
+          txns.push({ 
+            id: 'tx_' + genId(), 
+            custId: S.selCustId, 
+            type, 
+            amount, 
+            date, 
+            note: desc || (type === 'charge' ? 'Manual Charge' : 'Payment'),
+            linkedToId: linkedToId 
+          });
+        }
         
         DB.set('pt_txns_v7', txns);
-        set({ showModal: null });
+        set({ showModal: null, tempId: null });
       }
     };
   });
