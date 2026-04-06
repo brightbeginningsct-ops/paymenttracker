@@ -111,123 +111,11 @@ function getCustomerBalance(custId) {
   return DB.getTxns().filter(t => t.custId === custId).reduce((sum, t) => sum + (t.type === 'charge' ? t.amount : -t.amount), 0);
 }
 
-// --- CLOUD SYNC & BOURLOGIANNIS AUTO-IMPORT ---
+// --- CLOUD SYNC ---
 onValue(ref(db, 'bb_payments_system'), (snapshot) => {
   const data = snapshot.val();
   if (data) {
     dbCache = { ...dbCache, ...data };
-    
-    // THE BOURLOGIANNIS CORRECTION PATCH
-    const custs = dbCache.pt_customers_v7 || [];
-    let bCust = custs.find(c => c.name.toLowerCase().includes('bourlo'));
-    
-    if (bCust) {
-      let txns = dbCache.pt_txns_v7 || [];
-      let bTxns = txns.filter(t => t.custId === bCust.id);
-      
-      // Detect if historical charges are sitting there unlinked
-      const unlinkedCount = bTxns.filter(t => t.type === 'charge' && !bTxns.some(p => p.linkedToId === t.id)).length;
-      
-      if (unlinkedCount > 15) {
-        // Wipe the unlinked history and rebuild it perfectly linked
-        let newTxns = txns.filter(t => t.custId !== bCust.id);
-        
-        const bRaw = [
-          ["c",35,"2024-09-18","Registration Fee"],["p",189,"2024-09-18","Zelle Payment"],["c",154,"2026-04-06","Security Deposit"],
-          ["c",169,"2024-10-21","Week of 10/21/24"],["p",338,"2024-10-21","Zelle Payment"],["c",169,"2024-10-28","Week of 10/28/24"],
-          ["c",169,"2024-11-04","Week of 11/4/24"],["p",169,"2024-11-04","Zelle Payment"],["c",154,"2024-11-11","Week of 11/11/24"],
-          ["p",154,"2024-11-11","Zelle Payment"],["c",154,"2024-11-18","Week of 11/18/24"],["p",154,"2024-11-18","Zelle Payment"],
-          ["c",154,"2024-11-25","Week of 11/25/24"],["p",154,"2024-11-25","Zelle Payment"],["c",154,"2024-12-02","Week of 12/2/24"],
-          ["p",154,"2024-12-02","Zelle Payment"],["c",154,"2024-12-09","Week of 12/9/24"],["p",154,"2024-12-09","Zelle Payment"],
-          ["c",154,"2024-12-16","Week of 12/16/24"],["p",154,"2024-12-16","Zelle Payment"],["c",154,"2024-12-23","Week of 12/23/24"],
-          ["p",154,"2024-12-23","Zelle Payment"],["c",154,"2024-12-30","Week of 12/30/24"],["p",154,"2024-12-30","Zelle Payment"],
-          ["c",154,"2025-01-06","Week of 1/6/25"],["p",154,"2025-01-06","Zelle Payment"],["c",154,"2025-01-13","Week of 1/13/25"],
-          ["p",154,"2025-01-13","Zelle Payment"],["c",154,"2025-01-20","Week of 1/20/25"],["p",154,"2025-01-20","Zelle Payment"],
-          ["c",154,"2025-01-27","Week of 1/27/25"],["p",154,"2025-01-27","Zelle Payment"],["c",154,"2025-02-03","Week of 2/3/25"],
-          ["p",154,"2025-02-03","Zelle Payment"],["c",154,"2025-02-10","Week of 2/10/25"],["p",154,"2025-02-10","Zelle Payment"],
-          ["c",154,"2025-02-17","Week of 2/17/25"],["p",154,"2025-02-17","Zelle Payment"],["c",154,"2025-02-24","Week of 2/24/25"],
-          ["p",154,"2025-02-24","Zelle Payment"],["c",154,"2025-03-03","Week of 3/3/25"],["p",154,"2025-03-03","Zelle Payment"],
-          ["c",154,"2025-03-10","Week of 3/10/25"],["p",154,"2025-03-10","Zelle Payment"],["c",154,"2025-03-17","Week of 3/17/25"],
-          ["p",154,"2025-03-17","Zelle Payment"],["c",154,"2025-03-24","Week of 3/24/25"],["p",154,"2025-03-24","Zelle Payment"],
-          ["c",154,"2025-03-31","Week of 3/31/25"],["p",154,"2025-03-31","Zelle Payment"],["c",154,"2025-04-07","Week of 4/7/25"],
-          ["p",154,"2025-04-07","Zelle Payment"],["c",154,"2025-04-14","Week of 4/14/25"],["p",154,"2025-04-14","Zelle Payment"],
-          ["c",154,"2025-04-21","Week of 4/21/25"],["p",154,"2025-04-21","Zelle Payment"],["c",154,"2025-04-28","Week of 4/28/25"],
-          ["p",154,"2025-04-28","Zelle Payment"],["c",154,"2025-05-05","Week of 5/5/25"],["p",154,"2025-05-05","Zelle Payment"],
-          ["c",154,"2025-05-12","Week of 5/12/25"],["p",154,"2025-05-12","Zelle Payment"],["c",154,"2025-05-19","Week of 5/19/25"],
-          ["p",154,"2025-05-19","Zelle Payment"],["c",154,"2025-05-26","Week of 5/26/25"],["p",154,"2025-05-26","Zelle Payment"],
-          ["c",154,"2025-06-02","Week of 6/2/25"],["p",154,"2025-06-02","Zelle Payment"],["c",154,"2025-06-09","Week of 6/9/25"],
-          ["p",154,"2025-06-09","Zelle Payment"],["c",154,"2025-06-16","Week of 6/16/25"],["p",154,"2025-06-16","Zelle Payment"],
-          ["c",154,"2025-06-23","Week of 6/23/25"],["p",154,"2025-06-23","Zelle Payment"],["c",154,"2025-06-30","Week of 6/30/25"],
-          ["p",154,"2025-06-30","Zelle Payment"],["c",154,"2025-07-07","Week of 7/7/25"],["p",154,"2025-07-07","Zelle Payment"],
-          ["c",154,"2025-07-14","Week of 7/14/25"],["p",154,"2025-07-14","Zelle Payment"],["c",154,"2025-07-21","Week of 7/21/25"],
-          ["p",154,"2025-07-21","Zelle Payment"],["c",154,"2025-07-28","Week of 7/28/25"],["p",154,"2025-07-28","Zelle Payment"],
-          ["c",45,"2025-07-28","25/26 Registration Fee"],["p",45,"2025-07-28","Zelle Payment"],["c",154,"2025-08-04","Week of 8/4/25"],
-          ["p",154,"2025-08-04","Zelle Payment"],["c",154,"2025-08-11","Week of 8/11/25"],["p",154,"2025-08-11","Zelle Payment"],
-          ["c",154,"2025-08-18","Week of 8/18/25"],["p",154,"2025-08-18","Zelle Payment"],["c",161,"2025-08-25","Week of 8/25/25"],
-          ["p",154,"2025-08-25","Zelle Payment"],["p",7,"2025-08-25","Zelle Payment (Extra)"],["c",161,"2025-09-01","Week of 9/1/25"],
-          ["p",161,"2025-09-01","Zelle Payment"],["c",161,"2025-09-08","Week of 9/8/25"],["p",161,"2025-09-08","Zelle Payment"],
-          ["c",161,"2025-09-15","Week of 9/15/25"],["p",161,"2025-09-15","Zelle Payment"],["c",161,"2025-09-22","Week of 9/22/25"],
-          ["p",161,"2025-09-22","Zelle Payment"],["c",161,"2025-09-29","Week of 9/29/25"],["p",161,"2025-09-29","Zelle Payment"],
-          ["c",161,"2025-10-06","Week of 10/6/25"],["p",161,"2025-10-06","Zelle Payment"],["c",161,"2025-10-13","Week of 10/13/25"],
-          ["p",161,"2025-10-13","Zelle Payment"],["c",161,"2025-10-20","Week of 10/20/25"],["p",161,"2025-10-20","Zelle Payment"],
-          ["c",161,"2025-10-27","Week of 10/27/25"],["p",161,"2025-10-27","Zelle Payment"],["c",161,"2025-11-03","Week of 11/3/25"],
-          ["p",161,"2025-11-03","Zelle Payment"],["c",161,"2025-11-10","Week of 11/10/25"],["p",161,"2025-11-10","Zelle Payment"],
-          ["c",161,"2025-11-17","Week of 11/17/25"],["p",161,"2025-11-17","Zelle Payment"],["c",161,"2025-11-24","Week of 11/24/25"],
-          ["p",161,"2025-11-24","Zelle Payment"],["c",161,"2025-12-01","Week of 12/1/25"],["p",161,"2025-12-01","Zelle Payment"],
-          ["c",161,"2025-12-08","Week of 12/8/25"],["p",161,"2025-12-08","Zelle Payment"],["c",161,"2025-12-15","Week of 12/15/25"],
-          ["p",161,"2025-12-15","Zelle Payment"],["c",161,"2025-12-22","Week of 12/22/25"],["p",161,"2025-12-22","Zelle Payment"],
-          ["c",161,"2025-12-29","Week of 12/29/25"],["p",161,"2025-12-29","Zelle Payment"],["c",161,"2026-01-05","Week of 1/5/26"],
-          ["p",161,"2026-01-05","Zelle Payment"],["c",161,"2026-01-12","Week of 1/12/26"],["p",161,"2026-01-12","Zelle Payment"],
-          ["c",161,"2026-01-19","Week of 1/19/26"],["p",161,"2026-01-19","Zelle Payment"],["c",161,"2026-01-26","Week of 1/26/26"],
-          ["p",161,"2026-01-26","Zelle Payment"],["c",161,"2026-02-02","Week of 2/2/26"],["p",161,"2026-02-02","Zelle Payment"],
-          ["c",161,"2026-02-09","Week of 2/9/26"],["p",161,"2026-02-09","Zelle Payment"],["c",161,"2026-02-16","Week of 2/16/26"],
-          ["p",161,"2026-02-16","Zelle Payment"],["c",161,"2026-02-23","Week of 2/23/26"],["p",201,"2026-02-23","Zelle Payment"],
-          ["c",25,"2026-02-19","Iliana Registration 25/26"],["p",161,"2026-02-19","Zelle Payment"],["c",161,"2026-02-26","Iliana Security Deposit"],
-          ["p",161,"2026-02-26","Zelle Payment"],["c",337,"2026-03-02","Week of 3/2/26"],["p",161,"2026-03-02","Zelle Payment"],
-          ["c",337,"2026-03-09","Week of 3/9/26"],["p",176,"2026-03-09","Zelle Payment"],["c",337,"2026-03-16","Week of 3/16/26"],
-          ["p",161,"2026-03-16","Zelle Payment"],["c",337,"2026-03-23","Week of 3/23/26"],["p",161,"2026-03-23","Zelle Payment"],
-          ["c",337,"2026-03-30","Week of 3/30/26"],["p",850,"2026-03-30","Zelle Payment"],["c",337,"2026-04-06","Week of 4/6/26"]
-        ];
-        
-        let qCharges = [];
-        let pMents = [];
-        bRaw.forEach(r => {
-          if (r[0] === 'c') qCharges.push({ id: 'tx_' + Math.random().toString(36).substr(2, 9), amt: r[1], date: r[2], note: r[3] });
-          else pMents.push({ amt: r[1], date: r[2], note: r[3] });
-        });
-        
-        // Smart matching to automatically link payments to charges
-        pMents.forEach(p => {
-           let remaining = p.amt;
-           while (remaining > 0 && qCharges.length > 0) {
-              let c = qCharges[0];
-              if (remaining >= c.amt) {
-                 // Payment covers this charge fully
-                 newTxns.push({ id: 'tx_' + Math.random().toString(36).substr(2, 9), custId: bCust.id, type: 'payment', amount: c.amt, date: p.date, note: p.note, linkedToId: c.id });
-                 newTxns.push({ id: c.id, custId: bCust.id, type: 'charge', amount: c.amt, date: c.date, note: c.note, linkedToId: null });
-                 remaining -= c.amt;
-                 qCharges.shift(); // Mark as paid and remove from queue
-              } else {
-                 // Partial payment
-                 newTxns.push({ id: 'tx_' + Math.random().toString(36).substr(2, 9), custId: bCust.id, type: 'payment', amount: remaining, date: p.date, note: p.note, linkedToId: null });
-                 remaining = 0;
-              }
-           }
-           if (remaining > 0) {
-              newTxns.push({ id: 'tx_' + Math.random().toString(36).substr(2, 9), custId: bCust.id, type: 'payment', amount: remaining, date: p.date, note: p.note, linkedToId: null });
-           }
-        });
-        
-        // Any charges left over are accurately logged as Unpaid
-        qCharges.forEach(c => {
-           newTxns.push({ id: c.id, custId: bCust.id, type: 'charge', amount: c.amt, date: c.date, note: c.note, linkedToId: null });
-        });
-        
-        fbSet(ref(db, 'bb_payments_system/pt_txns_v7'), newTxns);
-        dbCache.pt_txns_v7 = newTxns;
-      }
-    }
-    
     render(); 
   } else {
     console.log("Waiting for data...");
@@ -473,7 +361,7 @@ function renderCustomerDetail() {
                if (lCharge) note = `<br><span style="font-size:11px; color:var(--muted)">↳ Applied to ${new Date(lCharge.date).toLocaleDateString()} charge</span>`;
             }
             return `
-              <tr>
+              <tr class="row-clickable" data-a="edit-tx" data-id="${t.id}" data-type="${t.type}">
                 <td class="col-mono" style="font-weight:600">${new Date(t.date).toLocaleDateString()}</td>
                 <td><span class="badge badge-${t.type === 'payment' ? 'gn' : 'rd'}">${t.type === 'payment' ? 'Payment' : 'Charge'}</span>${badge}</td>
                 <td style="color:var(--text); font-weight:600">${t.note}${note}</td>
@@ -561,19 +449,26 @@ function renderModal() {
   }
 
   if (S.showModal === 'add-charge') {
+    const isEdit = !!S.tempId;
+    const tx = isEdit ? DB.getTxns().find(t => t.id === S.tempId) : null;
+    const defDate = tx ? tx.date : now.toISOString().split('T')[0];
+    const defAmt = tx ? tx.amount : '';
+    const defNote = tx ? tx.note : '';
     const cProgs = (actCust.progs || []).map(cp => { const p = progs.find(x => x.id === cp.id); return p ? { ...p, disc: cp.disc } : null; }).filter(Boolean);
+    
     return `
       <div class="modal-overlay"><div class="modal">
-        <h2>Add Charge</h2><p style="font-size: 14px; font-weight: 800; color: var(--text2); margin-bottom: 20px;">Billing: <strong style="color: var(--blue)">${actCust?.name}</strong></p>
-        <div class="field"><label>Invoice Date</label><input type="date" id="m-date" value="${now.toISOString().split('T')[0]}"></div>
+        <h2>${isEdit ? 'Edit Charge' : 'Add Charge'}</h2><p style="font-size: 14px; font-weight: 800; color: var(--text2); margin-bottom: 20px;">Billing: <strong style="color: var(--blue)">${actCust?.name}</strong></p>
+        <div class="field"><label>Invoice Date</label><input type="date" id="m-date" value="${defDate}"></div>
         <div class="field"><label>Quick Fill</label><select id="m-quick-rates"><option value="">-- Custom Charge --</option>
           ${cProgs.length > 0 ? `<optgroup label="Family's Assigned Programs">${cProgs.map(cp => { const amt = cp.rate * (1 - cp.disc/100); return `<option value="${amt}" data-type="program" data-name="${cp.name}" data-freq="${cp.freq}">${cp.name} ${cp.disc ? '(Discounted)' : ''} - $${fmtH(amt)}</option>`; }).join('')}</optgroup>` : ''}
           <optgroup label="Standard Charges">${charges.map(ch => `<option value="${ch.amount}" data-type="charge" data-name="${ch.name}">${ch.name} - $${fmtH(ch.amount)}</option>`).join('')}</optgroup>
         </select></div>
-        <div class="field"><label>Amount ($)</label><input type="number" id="m-amt" step="0.01" placeholder="0.00"></div>
-        <div class="field"><label>Description</label><input type="text" id="m-note" placeholder="e.g. Tuition"></div>
+        <div class="field"><label>Amount ($)</label><input type="number" id="m-amt" step="0.01" value="${defAmt}" placeholder="0.00"></div>
+        <div class="field"><label>Description</label><input type="text" id="m-note" value="${defNote}" placeholder="e.g. Tuition"></div>
         <div style="display:flex; gap:12px; margin-top:28px">
-          <button class="btn btn-pk btn-full" data-a="save-tx" data-type="charge">Apply Charge</button>
+          <button class="btn btn-pk btn-full" data-a="save-tx" data-type="charge">${isEdit ? 'Save Changes' : 'Apply Charge'}</button>
+          ${isEdit ? `<button class="btn btn-rd" data-a="delete-tx">Delete</button>` : ''}
           <button class="btn btn-g btn-full" data-a="close-modal">Cancel</button>
         </div>
       </div></div>
@@ -581,17 +476,25 @@ function renderModal() {
   }
 
   if (S.showModal === 'add-payment') {
-    const aBal = getCustomerBalance(actCust.id); const allTx = DB.getTxns();
-    const uCharges = allTx.filter(t => t.custId === actCust.id && t.type === 'charge' && !allTx.some(p => p.type === 'payment' && p.linkedToId === t.id));
+    const isEdit = !!S.tempId;
+    const tx = isEdit ? DB.getTxns().find(t => t.id === S.tempId) : null;
+    const aBal = getCustomerBalance(actCust.id); 
+    const allTx = DB.getTxns();
+    const defDate = tx ? tx.date : now.toISOString().split('T')[0];
+    const defAmt = tx ? tx.amount : (aBal > 0 ? fmtH(aBal) : '');
+    const defNote = tx ? tx.note : '';
+    
+    const uCharges = allTx.filter(t => t.custId === actCust.id && t.type === 'charge' && (!allTx.some(p => p.type === 'payment' && p.linkedToId === t.id && p.id !== (tx?tx.id:null))));
     return `
       <div class="modal-overlay"><div class="modal">
-        <h2>Receive Payment</h2><p style="font-size: 14px; font-weight: 800; color: var(--text2); margin-bottom: 20px;">Receiving from: <strong style="color: var(--blue)">${actCust?.name}</strong></p>
-        <div class="field"><label>Apply to Specific Charge (Optional)</label><select id="m-linked-charge"><option value="">-- General Payment (Unlinked) --</option>${uCharges.map(c => `<option value="${c.id}" data-amt="${c.amount}">${new Date(c.date).toLocaleDateString()} - ${c.note} ($${fmtH(c.amount)})</option>`).join('')}</select></div>
-        <div class="field"><label>Date Received</label><input type="date" id="m-date" value="${now.toISOString().split('T')[0]}"></div>
-        <div class="field"><label>Amount Paid ($)</label><input type="number" id="m-amt" step="0.01" value="${aBal > 0 ? fmtH(aBal) : ''}" placeholder="0.00"></div>
-        <div class="field"><label>Payment Method / Note</label><input type="text" id="m-note" placeholder="e.g. Venmo, Check #1234"></div>
+        <h2>${isEdit ? 'Edit Payment' : 'Receive Payment'}</h2><p style="font-size: 14px; font-weight: 800; color: var(--text2); margin-bottom: 20px;">Receiving from: <strong style="color: var(--blue)">${actCust?.name}</strong></p>
+        <div class="field"><label>Apply to Specific Charge (Optional)</label><select id="m-linked-charge"><option value="">-- General Payment (Unlinked) --</option>${uCharges.map(c => `<option value="${c.id}" data-amt="${c.amount}" ${isEdit && tx.linkedToId === c.id ? 'selected' : ''}>${new Date(c.date).toLocaleDateString()} - ${c.note} ($${fmtH(c.amount)})</option>`).join('')}</select></div>
+        <div class="field"><label>Date Received</label><input type="date" id="m-date" value="${defDate}"></div>
+        <div class="field"><label>Amount Paid ($)</label><input type="number" id="m-amt" step="0.01" value="${defAmt}" placeholder="0.00"></div>
+        <div class="field"><label>Payment Method / Note</label><input type="text" id="m-note" value="${defNote}" placeholder="e.g. Venmo, Check #1234"></div>
         <div style="display:flex; gap:12px; margin-top:28px">
-          <button class="btn btn-y btn-full" data-a="save-tx" data-type="payment">Log Payment</button>
+          <button class="btn btn-y btn-full" data-a="save-tx" data-type="payment">${isEdit ? 'Save Changes' : 'Log Payment'}</button>
+          ${isEdit ? `<button class="btn btn-rd" data-a="delete-tx">Delete</button>` : ''}
           <button class="btn btn-g btn-full" data-a="close-modal">Cancel</button>
         </div>
       </div></div>
@@ -634,6 +537,12 @@ function bindEvents() {
 
       if (a === 'edit-prog') set({ showModal: 'edit-program', tempId: btn.getAttribute('data-id') });
       if (a === 'edit-charge') set({ showModal: 'edit-charge', tempId: btn.getAttribute('data-id') });
+      
+      if (a === 'edit-tx') {
+        const id = btn.getAttribute('data-id');
+        const type = btn.getAttribute('data-type');
+        set({ showModal: type === 'charge' ? 'add-charge' : 'add-payment', tempId: id });
+      }
 
       if (a === 'save-customer') {
         const n = document.getElementById('m-name').value.trim(), e = document.getElementById('m-email').value.trim(), p = document.getElementById('m-phone').value.trim(), add = document.getElementById('m-address').value.trim();
@@ -692,14 +601,29 @@ function bindEvents() {
         if(confirm("Delete this standard charge?")) { DB.set('pt_charges_v7', DB.getCharges().filter(c => c.id !== S.tempId)); set({ showModal: null, tempId: null }); }
       }
 
+      if (a === 'delete-tx') {
+        if(confirm("Are you sure you want to permanently delete this transaction?")) {
+          DB.set('pt_txns_v7', DB.getTxns().filter(t => t.id !== S.tempId)); 
+          set({ showModal: null, tempId: null }); 
+        }
+      }
+
       if (a === 'save-tx') {
         const type = btn.getAttribute('data-type'), amt = parseFloat(document.getElementById('m-amt').value), d = document.getElementById('m-date').value, note = document.getElementById('m-note').value.trim();
         if (isNaN(amt) || !d) return;
         let lId = null;
         if (type === 'payment') { const s = document.getElementById('m-linked-charge'); if (s && s.value) lId = s.value; }
+        
         const txns = DB.getTxns();
-        txns.push({ id: 'tx_' + genId(), custId: S.selCustId, type, amount: amt, date: d, note: note || (type === 'charge' ? 'Manual Charge' : 'Payment'), linkedToId: lId });
-        DB.set('pt_txns_v7', txns); set({ showModal: null });
+        if (S.tempId) {
+          const idx = txns.findIndex(t => t.id === S.tempId);
+          if (idx > -1) {
+            txns[idx].amount = amt; txns[idx].date = d; txns[idx].note = note || (type === 'charge' ? 'Manual Charge' : 'Payment'); txns[idx].linkedToId = lId;
+          }
+        } else {
+          txns.push({ id: 'tx_' + genId(), custId: S.selCustId, type, amount: amt, date: d, note: note || (type === 'charge' ? 'Manual Charge' : 'Payment'), linkedToId: lId });
+        }
+        DB.set('pt_txns_v7', txns); set({ showModal: null, tempId: null });
       }
     };
   });
