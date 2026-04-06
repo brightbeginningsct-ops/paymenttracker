@@ -97,10 +97,7 @@ const DB = {
   getCharges() { return dbCache.pt_charges_v7 || []; },
   getCustomers() { return dbCache.pt_customers_v7 || []; },
   getTxns() { return dbCache.pt_txns_v7 || []; },
-  set(k, v) {
-    dbCache[k] = v; 
-    fbSet(ref(db, 'bb_payments_system/' + k), v); 
-  }
+  set(k, v) { dbCache[k] = v; fbSet(ref(db, 'bb_payments_system/' + k), v); }
 };
 
 let S = { view: 'dashboard', selCustId: null, showModal: null, tempId: null, draftPrograms: [] };
@@ -111,11 +108,111 @@ function getCustomerBalance(custId) {
   return DB.getTxns().filter(t => t.custId === custId).reduce((sum, t) => sum + (t.type === 'charge' ? t.amount : -t.amount), 0);
 }
 
-// --- CLOUD SYNC ---
+// --- CLOUD SYNC & BOURLOGIANNIS AUTO-IMPORT ---
 onValue(ref(db, 'bb_payments_system'), (snapshot) => {
   const data = snapshot.val();
   if (data) {
     dbCache = { ...dbCache, ...data };
+    
+    const custs = dbCache.pt_customers_v7 || [];
+    let bCust = custs.find(c => c.name.toLowerCase().includes('bourlo'));
+    
+    if (bCust) {
+      let txns = dbCache.pt_txns_v7 || [];
+      let bTxns = txns.filter(t => t.custId === bCust.id);
+      
+      // If history is still broken or unlinked, wipe and inject the perfect data.
+      const unlinkedCount = bTxns.filter(t => t.type === 'charge' && !bTxns.some(p => p.linkedToId === t.id)).length;
+      
+      if (unlinkedCount > 15 || !bTxns.some(t => t.amount === 850 && t.date === "2026-04-02")) {
+        let newTxns = txns.filter(t => t.custId !== bCust.id);
+        const bRaw = [
+          ["c", 35.0, "2024-09-18", "Registration Fee"], ["p", 189.0, "2024-09-18", "Zelle Payment"], ["c", 154.0, "2024-09-18", "Security Deposit"], 
+          ["c", 169.0, "2024-10-21", "Week of 10/21/24"], ["p", 338.0, "2024-10-24", "Zelle Payment"], ["c", 169.0, "2024-10-28", "Week of 10/28/24"], 
+          ["c", 169.0, "2024-11-04", "Week of 11/4/24"], ["p", 169.0, "2024-10-30", "Zelle Payment"], ["c", 154.0, "2024-11-11", "Week of 11/11/24"], 
+          ["p", 154.0, "2024-11-07", "Zelle Payment"], ["c", 154.0, "2024-11-18", "Week of 11/18/24"], ["p", 154.0, "2024-11-14", "Zelle Payment"], 
+          ["c", 154.0, "2024-11-25", "Week of 11/25/24"], ["p", 154.0, "2024-11-21", "Zelle Payment"], ["c", 154.0, "2024-12-02", "Week of 12/2/24"], 
+          ["p", 154.0, "2024-11-28", "Zelle Payment"], ["c", 154.0, "2024-12-09", "Week of 12/9/24"], ["p", 154.0, "2024-12-05", "Zelle Payment"], 
+          ["c", 154.0, "2024-12-16", "Week of 12/16/24"], ["p", 154.0, "2024-12-12", "Zelle Payment"], ["c", 154.0, "2024-12-23", "Week of 12/23/24"], 
+          ["p", 154.0, "2024-12-19", "Zelle Payment"], ["c", 154.0, "2024-12-30", "Week of 12/30/24"], ["p", 154.0, "2024-12-26", "Zelle Payment"], 
+          ["c", 154.0, "2025-01-06", "Week of 1/6/25"], ["p", 154.0, "2025-01-02", "Zelle Payment"], ["c", 154.0, "2025-01-13", "Week of 1/13/25"], 
+          ["p", 154.0, "2025-01-09", "Zelle Payment"], ["c", 154.0, "2025-01-20", "Week of 1/20/25"], ["p", 154.0, "2025-01-16", "Zelle Payment"], 
+          ["c", 154.0, "2025-01-27", "Week of 1/27/25"], ["p", 154.0, "2025-01-23", "Zelle Payment"], ["c", 154.0, "2025-02-03", "Week of 2/3/25"], 
+          ["p", 154.0, "2025-01-31", "Zelle Payment"], ["c", 154.0, "2025-02-10", "Week of 2/10/25"], ["p", 154.0, "2025-02-06", "Zelle Payment"], 
+          ["c", 154.0, "2025-02-17", "Week of 2/17/25"], ["p", 154.0, "2025-02-13", "Zelle Payment"], ["c", 154.0, "2025-02-24", "Week of 2/24/25"], 
+          ["p", 154.0, "2025-02-20", "Zelle Payment"], ["c", 154.0, "2025-03-03", "Week of 3/3/25"], ["p", 154.0, "2025-02-27", "Zelle Payment"], 
+          ["c", 154.0, "2025-03-10", "Week of 3/10/25"], ["p", 154.0, "2025-03-06", "Zelle Payment"], ["c", 154.0, "2025-03-17", "Week of 3/17/25"], 
+          ["p", 154.0, "2025-03-13", "Zelle Payment"], ["c", 154.0, "2025-03-24", "Week of 3/24/25"], ["p", 154.0, "2025-03-20", "Zelle Payment"], 
+          ["c", 154.0, "2025-03-31", "Week of 3/31/25"], ["p", 154.0, "2025-03-27", "Zelle Payment"], ["c", 154.0, "2025-04-07", "Week of 4/7/25"], 
+          ["p", 154.0, "2025-04-03", "Zelle Payment"], ["c", 154.0, "2025-04-14", "Week of 4/14/25"], ["p", 154.0, "2025-04-10", "Zelle Payment"], 
+          ["c", 154.0, "2025-04-21", "Week of 4/21/25"], ["p", 154.0, "2025-04-17", "Zelle Payment"], ["c", 154.0, "2025-04-28", "Week of 4/28/25"], 
+          ["p", 154.0, "2025-04-24", "Zelle Payment"], ["c", 154.0, "2025-05-05", "Week of 5/5/25"], ["p", 154.0, "2025-05-01", "Zelle Payment"], 
+          ["c", 154.0, "2025-05-12", "Week of 5/12/25"], ["p", 154.0, "2025-05-08", "Zelle Payment"], ["c", 154.0, "2025-05-19", "Week of 5/19/25"], 
+          ["p", 154.0, "2025-05-15", "Zelle Payment"], ["c", 154.0, "2025-05-26", "Week of 5/26/25"], ["p", 154.0, "2025-05-22", "Zelle Payment"], 
+          ["c", 154.0, "2025-06-02", "Week of 6/2/25"], ["p", 154.0, "2025-05-29", "Zelle Payment"], ["c", 154.0, "2025-06-09", "Week of 6/9/25"], 
+          ["p", 154.0, "2025-06-05", "Zelle Payment"], ["c", 154.0, "2025-06-16", "Week of 6/16/25"], ["p", 154.0, "2025-06-12", "Zelle Payment"], 
+          ["c", 154.0, "2025-06-23", "Week of 6/23/25"], ["p", 154.0, "2025-06-19", "Zelle Payment"], ["c", 154.0, "2025-06-30", "Week of 6/30/25"], 
+          ["p", 154.0, "2025-06-26", "Zelle Payment"], ["c", 154.0, "2025-07-07", "Week of 7/7/25"], ["p", 154.0, "2025-07-03", "Zelle Payment"], 
+          ["c", 154.0, "2025-07-14", "Week of 7/14/25"], ["p", 154.0, "2025-07-10", "Zelle Payment"], ["c", 154.0, "2025-07-21", "Week of 7/21/25"], 
+          ["p", 154.0, "2025-07-17", "Zelle Payment"], ["c", 154.0, "2025-07-28", "Week of 7/28/25"], ["p", 154.0, "2025-07-24", "Zelle Payment"], 
+          ["c", 45.0, "2025-07-28", "25/26 Registration Fee"], ["p", 45.0, "2025-07-28", "Zelle Payment"], ["c", 154.0, "2025-08-04", "Week of 8/4/25"], 
+          ["p", 154.0, "2025-07-31", "Zelle Payment"], ["c", 154.0, "2025-08-11", "Week of 8/11/25"], ["p", 154.0, "2025-08-07", "Zelle Payment"], 
+          ["c", 154.0, "2025-08-18", "Week of 8/18/25"], ["p", 154.0, "2025-08-14", "Zelle Payment"], ["c", 161.0, "2025-08-25", "Week of 8/25/25"], 
+          ["p", 154.0, "2025-08-21", "Zelle Payment"], ["p", 7.0, "2025-08-25", "Zelle Payment"], ["c", 161.0, "2025-09-01", "Week of 9/1/25"], 
+          ["p", 161.0, "2025-08-28", "Zelle Payment"], ["c", 161.0, "2025-09-08", "Week of 9/8/25"], ["p", 161.0, "2025-09-04", "Zelle Payment"], 
+          ["c", 161.0, "2025-09-15", "Week of 9/15/25"], ["p", 161.0, "2025-09-11", "Zelle Payment"], ["c", 161.0, "2025-09-22", "Week of 9/22/25"], 
+          ["p", 161.0, "2025-09-18", "Zelle Payment"], ["c", 161.0, "2025-09-29", "Week of 9/29/25"], ["p", 161.0, "2025-09-25", "Zelle Payment"], 
+          ["c", 161.0, "2025-10-06", "Week of 10/6/25"], ["p", 161.0, "2025-10-02", "Zelle Payment"], ["c", 161.0, "2025-10-13", "Week of 10/13/25"], 
+          ["p", 161.0, "2025-10-09", "Zelle Payment"], ["c", 161.0, "2025-10-20", "Week of 10/20/25"], ["p", 161.0, "2025-10-16", "Zelle Payment"], 
+          ["c", 161.0, "2025-10-27", "Week of 10/27/25"], ["p", 161.0, "2025-10-23", "Zelle Payment"], ["c", 161.0, "2025-11-03", "Week of 11/3/25"], 
+          ["p", 161.0, "2025-10-30", "Zelle Payment"], ["c", 161.0, "2025-11-10", "Week of 11/10/25"], ["p", 161.0, "2025-11-06", "Zelle Payment"], 
+          ["c", 161.0, "2025-11-17", "Week of 11/17/25"], ["p", 161.0, "2025-11-13", "Zelle Payment"], ["c", 161.0, "2025-11-24", "Week of 11/24/25"], 
+          ["p", 161.0, "2025-11-20", "Zelle Payment"], ["c", 161.0, "2025-12-01", "Week of 12/1/25"], ["p", 161.0, "2025-11-27", "Zelle Payment"], 
+          ["c", 161.0, "2025-12-08", "Week of 12/8/25"], ["p", 161.0, "2025-12-04", "Zelle Payment"], ["c", 161.0, "2025-12-15", "Week of 12/15/25"], 
+          ["p", 161.0, "2025-12-11", "Zelle Payment"], ["c", 161.0, "2025-12-22", "Week of 12/22/25"], ["p", 161.0, "2025-12-18", "Zelle Payment"], 
+          ["c", 161.0, "2025-12-29", "Week of 12/29/25"], ["p", 161.0, "2025-12-25", "Zelle Payment"], ["c", 161.0, "2026-01-05", "Week of 1/5/26"], 
+          ["p", 161.0, "2026-01-01", "Zelle Payment"], ["c", 161.0, "2026-01-12", "Week of 1/12/26"], ["p", 161.0, "2026-01-08", "Zelle Payment"], 
+          ["c", 161.0, "2026-01-19", "Week of 1/19/26"], ["p", 161.0, "2026-01-15", "Zelle Payment"], ["c", 161.0, "2026-01-26", "Week of 1/26/26"], 
+          ["p", 161.0, "2026-01-22", "Zelle Payment"], ["c", 161.0, "2026-02-02", "Week of 2/2/26"], ["p", 161.0, "2026-01-29", "Zelle Payment"], 
+          ["c", 161.0, "2026-02-09", "Week of 2/9/26"], ["p", 161.0, "2026-02-05", "Zelle Payment"], ["c", 161.0, "2026-02-16", "Week of 2/16/26"], 
+          ["p", 161.0, "2026-02-12", "Zelle Payment"], ["c", 161.0, "2026-02-23", "Week of 2/23/26"], ["p", 201.0, "2026-02-18", "Zelle Payment"], 
+          ["c", 25.0, "2026-02-19", "Iliana Registration 25/26"], ["p", 161.0, "2026-02-19", "Zelle Payment"], ["c", 161.0, "2026-02-26", "Iliana Security Deposit"], 
+          ["p", 161.0, "2026-02-26", "Zelle Payment"], ["c", 337.0, "2026-03-02", "Week of 3/2/26"], ["p", 161.0, "2026-03-05", "Zelle Payment"], 
+          ["c", 337.0, "2026-03-09", "Week of 3/9/26"], ["p", 176.0, "2026-03-06", "Zelle Payment"], ["c", 337.0, "2026-03-16", "Week of 3/16/26"], 
+          ["p", 161.0, "2026-03-12", "Zelle Payment"], ["c", 337.0, "2026-03-23", "Week of 3/23/26"], ["p", 161.0, "2026-03-19", "Zelle Payment"], 
+          ["c", 337.0, "2026-03-30", "Week of 3/30/26"], ["p", 850.0, "2026-04-02", "Zelle Payment"], ["c", 337.0, "2026-04-06", "Week of 4/6/26"]
+        ];
+        
+        let qC = [];
+        let pM = [];
+        bRaw.forEach(r => {
+          if(r[0] === 'c') qC.push({id: 'tx_' + genId(), amt: r[1], date: r[2], note: r[3]});
+          else pM.push({amt: r[1], date: r[2], note: r[3]});
+        });
+        
+        pM.forEach(p => {
+           let rem = p.amt;
+           while(rem > 0 && qC.length > 0) {
+              let c = qC[0];
+              if (rem >= c.amt) {
+                 newTxns.push({ id: 'tx_' + genId(), custId: bCust.id, type: 'payment', amount: c.amt, date: p.date, note: p.note, linkedToId: c.id });
+                 newTxns.push({ id: c.id, custId: bCust.id, type: 'charge', amount: c.amt, date: c.date, note: c.note, linkedToId: null });
+                 rem -= c.amt; qC.shift();
+              } else {
+                 newTxns.push({ id: 'tx_' + genId(), custId: bCust.id, type: 'payment', amount: rem, date: p.date, note: p.note, linkedToId: null });
+                 rem = 0;
+              }
+           }
+           if (rem > 0) newTxns.push({ id: 'tx_' + genId(), custId: bCust.id, type: 'payment', amount: rem, date: p.date, note: p.note, linkedToId: null });
+        });
+        
+        qC.forEach(c => newTxns.push({ id: c.id, custId: bCust.id, type: 'charge', amount: c.amt, date: c.date, note: c.note, linkedToId: null }));
+        
+        fbSet(ref(db, 'bb_payments_system/pt_txns_v7'), newTxns);
+        dbCache.pt_txns_v7 = newTxns;
+      }
+    }
+    
     render(); 
   } else {
     console.log("Waiting for data...");
@@ -395,7 +492,7 @@ function renderModal() {
     return `
       <div class="modal-overlay"><div class="modal">
         <h2>${e ? 'Edit Family Info' : 'Add New Family'}</h2>
-        <div class="field"><label>Family Name</label><input type="text" id="m-name" value="${c.name}" placeholder="e.g. Smith Family"></div>
+        <div class="field"><label>Family Name</label><input type="text" id="m-name" value="${c.name}" placeholder="e.g. Smith Family" autocomplete="off"></div>
         <div style="display:flex; gap:12px">
           <div class="field" style="flex:1"><label>Email Address</label><input type="email" id="m-email" value="${c.email}" placeholder="name@example.com"></div>
           <div class="field" style="flex:1"><label>Phone Number</label><input type="tel" id="m-phone" value="${c.phone}" placeholder="(555) 555-5555"></div>
@@ -460,10 +557,11 @@ function renderModal() {
       <div class="modal-overlay"><div class="modal">
         <h2>${isEdit ? 'Edit Charge' : 'Add Charge'}</h2><p style="font-size: 14px; font-weight: 800; color: var(--text2); margin-bottom: 20px;">Billing: <strong style="color: var(--blue)">${actCust?.name}</strong></p>
         <div class="field"><label>Invoice Date</label><input type="date" id="m-date" value="${defDate}"></div>
+        ${!isEdit ? `
         <div class="field"><label>Quick Fill</label><select id="m-quick-rates"><option value="">-- Custom Charge --</option>
           ${cProgs.length > 0 ? `<optgroup label="Family's Assigned Programs">${cProgs.map(cp => { const amt = cp.rate * (1 - cp.disc/100); return `<option value="${amt}" data-type="program" data-name="${cp.name}" data-freq="${cp.freq}">${cp.name} ${cp.disc ? '(Discounted)' : ''} - $${fmtH(amt)}</option>`; }).join('')}</optgroup>` : ''}
           <optgroup label="Standard Charges">${charges.map(ch => `<option value="${ch.amount}" data-type="charge" data-name="${ch.name}">${ch.name} - $${fmtH(ch.amount)}</option>`).join('')}</optgroup>
-        </select></div>
+        </select></div>` : ''}
         <div class="field"><label>Amount ($)</label><input type="number" id="m-amt" step="0.01" value="${defAmt}" placeholder="0.00"></div>
         <div class="field"><label>Description</label><input type="text" id="m-note" value="${defNote}" placeholder="e.g. Tuition"></div>
         <div style="display:flex; gap:12px; margin-top:28px">
