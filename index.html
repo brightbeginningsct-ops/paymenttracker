@@ -117,26 +117,104 @@ onValue(ref(db, 'bb_payments_system'), (snapshot) => {
   if (data) {
     dbCache = { ...dbCache, ...data };
     
-    // Check if Bourlogiannis needs history imported
+    // THE BOURLOGIANNIS CORRECTION PATCH
     const custs = dbCache.pt_customers_v7 || [];
     let bCust = custs.find(c => c.name.toLowerCase().includes('bourlo'));
     
-    if (!bCust) {
-      bCust = { id: 'c_' + genId(), name: "Bourlogiannis", email: "", phone: "", address: "", progs: [], archived: false };
-      custs.push(bCust);
-      fbSet(ref(db, 'bb_payments_system/pt_customers_v7'), custs);
-    }
-    
-    let txns = dbCache.pt_txns_v7 || [];
-    let bTxns = txns.filter(t => t.custId === bCust.id);
-    
-    if (bTxns.length < 10) {
-      const bRaw = [["c",35,"2024-09-18","Registration Fee"],["p",189,"2024-09-18","Zelle Payment"],["c",154,"2026-04-06","Security Deposit"],["c",169,"2024-10-21","Week of 10/21/24"],["p",338,"2024-10-21","Zelle Payment"],["c",169,"2024-10-28","Week of 10/28/24"],["c",169,"2024-11-04","Week of 11/4/24"],["p",169,"2024-11-04","Zelle Payment"],["c",154,"2024-11-11","Week of 11/11/24"],["p",154,"2024-11-11","Zelle Payment"],["c",154,"2024-11-18","Week of 11/18/24"],["p",154,"2024-11-18","Zelle Payment"],["c",154,"2024-11-25","Week of 11/25/24"],["p",154,"2024-11-25","Zelle Payment"],["c",154,"2024-12-02","Week of 12/2/24"],["p",154,"2024-12-02","Zelle Payment"],["c",154,"2024-12-09","Week of 12/9/24"],["p",154,"2024-12-09","Zelle Payment"],["c",154,"2024-12-16","Week of 12/16/24"],["p",154,"2024-12-16","Zelle Payment"],["p",154,"2024-12-23","Zelle Payment"],["c",154,"2024-12-30","Week of 12/30/24"],["p",154,"2024-12-30","Zelle Payment"],["c",154,"2025-01-06","Week of 1/6/25"],["p",154,"2025-01-06","Zelle Payment"],["c",154,"2025-01-13","Week of 1/13/25"],["p",154,"2025-01-13","Zelle Payment"],["c",154,"2025-01-20","Week of 1/20/25"],["p",154,"2025-01-20","Zelle Payment"],["c",154,"2025-01-27","Week of 1/27/25"],["p",154,"2025-01-27","Zelle Payment"],["c",154,"2025-02-03","Week of 2/3/25"],["p",154,"2025-02-03","Zelle Payment"],["c",154,"2025-02-10","Week of 2/10/25"],["p",154,"2025-02-10","Zelle Payment"],["c",154,"2025-02-17","Week of 2/17/25"],["p",154,"2025-02-17","Zelle Payment"],["c",154,"2025-02-24","Week of 2/24/25"],["p",154,"2025-02-24","Zelle Payment"],["c",154,"2025-03-03","Week of 3/3/25"],["p",154,"2025-03-03","Zelle Payment"],["p",154,"2025-03-10","Zelle Payment"],["c",154,"2025-03-17","Week of 3/17/25"],["p",154,"2025-03-17","Zelle Payment"],["c",154,"2025-03-24","Week of 3/24/25"],["p",154,"2025-03-24","Zelle Payment"],["c",154,"2025-03-31","Week of 3/31/25"],["p",154,"2025-03-31","Zelle Payment"],["c",154,"2025-04-07","Week of 4/7/25"],["p",154,"2025-04-07","Zelle Payment"],["c",154,"2025-04-14","Week of 4/14/25"],["p",154,"2025-04-14","Zelle Payment"],["c",154,"2025-04-21","Week of 4/21/25"],["p",154,"2025-04-21","Zelle Payment"],["c",154,"2025-04-28","Week of 4/28/25"],["p",154,"2025-04-28","Zelle Payment"],["c",154,"2025-05-05","Week of 5/5/25"],["p",154,"2025-05-05","Zelle Payment"],["c",154,"2025-05-12","Week of 5/12/25"],["p",154,"2025-05-12","Zelle Payment"],["p",154,"2025-05-19","Zelle Payment"],["c",154,"2025-05-26","Week of 5/26/25"],["p",154,"2025-05-26","Zelle Payment"],["c",154,"2025-06-02","Week of 6/2/25"],["p",154,"2025-06-02","Zelle Payment"],["c",154,"2025-06-09","Week of 6/9/25"],["p",154,"2025-06-09","Zelle Payment"],["c",154,"2025-06-16","Week of 6/16/25"],["p",154,"2025-06-16","Zelle Payment"],["c",154,"2025-06-23","Week of 6/23/25"],["p",154,"2025-06-23","Zelle Payment"],["p",154,"2025-06-30","Zelle Payment"],["c",154,"2025-07-07","Week of 7/7/25"],["p",154,"2025-07-07","Zelle Payment"],["c",154,"2025-07-14","Week of 7/14/25"],["p",154,"2025-07-14","Zelle Payment"],["c",154,"2025-07-21","Week of 7/21/25"],["p",154,"2025-07-21","Zelle Payment"],["c",154,"2025-07-28","Week of 7/28/25"],["p",154,"2025-07-28","Zelle Payment"],["c",45,"2025-07-28","25/26 Registration Fee"],["p",45,"2025-07-28","Zelle Payment"],["c",154,"2025-08-04","Week of 8/4/25"],["p",154,"2025-08-04","Zelle Payment"],["c",154,"2025-08-11","Week of 8/11/25"],["p",154,"2025-08-11","Zelle Payment"],["c",154,"2025-08-18","Week of 8/18/25"],["p",154,"2025-08-18","Zelle Payment"],["c",161,"2025-08-25","Week of 8/25/25"],["p",154,"2025-08-25","Zelle Payment"],["p",7,"2025-08-25","Zelle Payment (Extra)"],["c",161,"2025-09-01","Week of 9/1/25"],["p",161,"2025-09-01","Zelle Payment"],["c",161,"2025-09-08","Week of 9/8/25"],["p",161,"2025-09-08","Zelle Payment"],["c",161,"2025-09-15","Week of 9/15/25"],["p",161,"2025-09-15","Zelle Payment"],["c",161,"2025-09-22","Week of 9/22/25"],["p",161,"2025-09-22","Zelle Payment"],["c",161,"2025-09-29","Week of 9/29/25"],["p",161,"2025-09-29","Zelle Payment"],["c",161,"2025-10-06","Week of 10/6/25"],["p",161,"2025-10-06","Zelle Payment"],["c",161,"2025-10-13","Week of 10/13/25"],["p",161,"2025-10-13","Zelle Payment"],["c",161,"2025-10-20","Week of 10/20/25"],["p",161,"2025-10-20","Zelle Payment"],["c",161,"2025-10-27","Week of 10/27/25"],["p",161,"2025-10-27","Zelle Payment"],["c",161,"2025-11-03","Week of 11/3/25"],["p",161,"2025-11-03","Zelle Payment"],["c",161,"2025-11-10","Week of 11/10/25"],["p",161,"2025-11-10","Zelle Payment"],["c",161,"2025-11-17","Week of 11/17/25"],["p",161,"2025-11-17","Zelle Payment"],["c",161,"2025-11-24","Week of 11/24/25"],["p",161,"2025-11-24","Zelle Payment"],["c",161,"2025-12-01","Week of 12/1/25"],["p",161,"2025-12-01","Zelle Payment"],["c",161,"2025-12-08","Week of 12/8/25"],["p",161,"2025-12-08","Zelle Payment"],["c",161,"2025-12-15","Week of 12/15/25"],["p",161,"2025-12-15","Zelle Payment"],["c",161,"2025-12-22","Week of 12/22/25"],["p",161,"2025-12-22","Zelle Payment"],["c",161,"2025-12-29","Week of 12/29/25"],["p",161,"2025-12-29","Zelle Payment"],["c",161,"2026-01-05","Week of 1/5/26"],["p",161,"2026-01-05","Zelle Payment"],["c",161,"2026-01-12","Week of 1/12/26"],["p",161,"2026-01-12","Zelle Payment"],["c",161,"2026-01-19","Week of 1/19/26"],["p",161,"2026-01-19","Zelle Payment"],["c",161,"2026-01-26","Week of 1/26/26"],["p",161,"2026-01-26","Zelle Payment"],["c",161,"2026-02-02","Week of 2/2/26"],["p",161,"2026-02-02","Zelle Payment"],["c",161,"2026-02-09","Week of 2/9/26"],["p",161,"2026-02-09","Zelle Payment"],["c",161,"2026-02-16","Week of 2/16/26"],["p",161,"2026-02-16","Zelle Payment"],["c",161,"2026-02-23","Week of 2/23/26"],["p",201,"2026-02-23","Zelle Payment"],["c",25,"2026-02-19","Iliana Registration 25/26"],["p",161,"2026-02-19","Zelle Payment"],["c",161,"2026-02-26","Iliana Security Deposit"],["p",161,"2026-02-26","Zelle Payment"],["c",337,"2026-03-02","Week of 3/2/26"],["p",161,"2026-03-02","Zelle Payment"],["c",337,"2026-03-09","Week of 3/9/26"],["p",176,"2026-03-09","Zelle Payment"],["c",337,"2026-03-16","Week of 3/16/26"],["p",161,"2026-03-16","Zelle Payment"],["c",337,"2026-03-23","Week of 3/23/26"],["p",161,"2026-03-23","Zelle Payment"],["c",337,"2026-03-30","Week of 3/30/26"],["p",850,"2026-03-30","Zelle Payment"],["c",337,"2026-04-06","Week of 4/6/26"]];
+    if (bCust) {
+      let txns = dbCache.pt_txns_v7 || [];
+      let bTxns = txns.filter(t => t.custId === bCust.id);
       
-      const newTxns = txns.filter(t => t.custId !== bCust.id);
-      bRaw.forEach(r => newTxns.push({ id: 'tx_' + genId(), custId: bCust.id, type: r[0]==='c'?'charge':'payment', amount: r[1], date: r[2], note: r[3], linkedToId: null }));
-      fbSet(ref(db, 'bb_payments_system/pt_txns_v7'), newTxns);
-      dbCache.pt_txns_v7 = newTxns;
+      // If the buggy history is present (missing the 12/23/24 charge), fix it!
+      const hasMissingCharge = !bTxns.some(t => t.note === "Week of 12/23/24");
+      
+      if (hasMissingCharge) {
+        const bRaw = [
+          ["c",35,"2024-09-18","Registration Fee"],["p",189,"2024-09-18","Zelle Payment"],["c",154,"2026-04-06","Security Deposit"],
+          ["c",169,"2024-10-21","Week of 10/21/24"],["p",338,"2024-10-21","Zelle Payment"],["c",169,"2024-10-28","Week of 10/28/24"],
+          ["c",169,"2024-11-04","Week of 11/4/24"],["p",169,"2024-11-04","Zelle Payment"],["c",154,"2024-11-11","Week of 11/11/24"],
+          ["p",154,"2024-11-11","Zelle Payment"],["c",154,"2024-11-18","Week of 11/18/24"],["p",154,"2024-11-18","Zelle Payment"],
+          ["c",154,"2024-11-25","Week of 11/25/24"],["p",154,"2024-11-25","Zelle Payment"],["c",154,"2024-12-02","Week of 12/2/24"],
+          ["p",154,"2024-12-02","Zelle Payment"],["c",154,"2024-12-09","Week of 12/9/24"],["p",154,"2024-12-09","Zelle Payment"],
+          ["c",154,"2024-12-16","Week of 12/16/24"],["p",154,"2024-12-16","Zelle Payment"],
+          
+          /* --> Missing Phantom Charge 1 <-- */
+          ["c",154,"2024-12-23","Week of 12/23/24"],["p",154,"2024-12-23","Zelle Payment"],
+          
+          ["c",154,"2024-12-30","Week of 12/30/24"],["p",154,"2024-12-30","Zelle Payment"],["c",154,"2025-01-06","Week of 1/6/25"],
+          ["p",154,"2025-01-06","Zelle Payment"],["c",154,"2025-01-13","Week of 1/13/25"],["p",154,"2025-01-13","Zelle Payment"],
+          ["c",154,"2025-01-20","Week of 1/20/25"],["p",154,"2025-01-20","Zelle Payment"],["c",154,"2025-01-27","Week of 1/27/25"],
+          ["p",154,"2025-01-27","Zelle Payment"],["c",154,"2025-02-03","Week of 2/3/25"],["p",154,"2025-02-03","Zelle Payment"],
+          ["c",154,"2025-02-10","Week of 2/10/25"],["p",154,"2025-02-10","Zelle Payment"],["c",154,"2025-02-17","Week of 2/17/25"],
+          ["p",154,"2025-02-17","Zelle Payment"],["c",154,"2025-02-24","Week of 2/24/25"],["p",154,"2025-02-24","Zelle Payment"],
+          ["c",154,"2025-03-03","Week of 3/3/25"],["p",154,"2025-03-03","Zelle Payment"],
+          
+          /* --> Missing Phantom Charge 2 <-- */
+          ["c",154,"2025-03-10","Week of 3/10/25"],["p",154,"2025-03-10","Zelle Payment"],
+          
+          ["c",154,"2025-03-17","Week of 3/17/25"],["p",154,"2025-03-17","Zelle Payment"],["c",154,"2025-03-24","Week of 3/24/25"],
+          ["p",154,"2025-03-24","Zelle Payment"],["c",154,"2025-03-31","Week of 3/31/25"],["p",154,"2025-03-31","Zelle Payment"],
+          ["c",154,"2025-04-07","Week of 4/7/25"],["p",154,"2025-04-07","Zelle Payment"],["c",154,"2025-04-14","Week of 4/14/25"],
+          ["p",154,"2025-04-14","Zelle Payment"],["c",154,"2025-04-21","Week of 4/21/25"],["p",154,"2025-04-21","Zelle Payment"],
+          ["c",154,"2025-04-28","Week of 4/28/25"],["p",154,"2025-04-28","Zelle Payment"],["c",154,"2025-05-05","Week of 5/5/25"],
+          ["p",154,"2025-05-05","Zelle Payment"],["c",154,"2025-05-12","Week of 5/12/25"],["p",154,"2025-05-12","Zelle Payment"],
+          
+          /* --> Missing Phantom Charge 3 <-- */
+          ["c",154,"2025-05-19","Week of 5/19/25"],["p",154,"2025-05-19","Zelle Payment"],
+          
+          ["c",154,"2025-05-26","Week of 5/26/25"],["p",154,"2025-05-26","Zelle Payment"],["c",154,"2025-06-02","Week of 6/2/25"],
+          ["p",154,"2025-06-02","Zelle Payment"],["c",154,"2025-06-09","Week of 6/9/25"],["p",154,"2025-06-09","Zelle Payment"],
+          ["c",154,"2025-06-16","Week of 6/16/25"],["p",154,"2025-06-16","Zelle Payment"],["c",154,"2025-06-23","Week of 6/23/25"],
+          ["p",154,"2025-06-23","Zelle Payment"],
+          
+          /* --> Missing Phantom Charge 4 <-- */
+          ["c",154,"2025-06-30","Week of 6/30/25"],["p",154,"2025-06-30","Zelle Payment"],
+          
+          ["c",154,"2025-07-07","Week of 7/7/25"],["p",154,"2025-07-07","Zelle Payment"],["c",154,"2025-07-14","Week of 7/14/25"],
+          ["p",154,"2025-07-14","Zelle Payment"],["c",154,"2025-07-21","Week of 7/21/25"],["p",154,"2025-07-21","Zelle Payment"],
+          ["c",154,"2025-07-28","Week of 7/28/25"],["p",154,"2025-07-28","Zelle Payment"],["c",45,"2025-07-28","25/26 Registration Fee"],
+          ["p",45,"2025-07-28","Zelle Payment"],["c",154,"2025-08-04","Week of 8/4/25"],["p",154,"2025-08-04","Zelle Payment"],
+          ["c",154,"2025-08-11","Week of 8/11/25"],["p",154,"2025-08-11","Zelle Payment"],["c",154,"2025-08-18","Week of 8/18/25"],
+          ["p",154,"2025-08-18","Zelle Payment"],["c",161,"2025-08-25","Week of 8/25/25"],["p",154,"2025-08-25","Zelle Payment"],
+          ["p",7,"2025-08-25","Zelle Payment (Extra)"],["c",161,"2025-09-01","Week of 9/1/25"],["p",161,"2025-09-01","Zelle Payment"],
+          ["c",161,"2025-09-08","Week of 9/8/25"],["p",161,"2025-09-08","Zelle Payment"],["c",161,"2025-09-15","Week of 9/15/25"],
+          ["p",161,"2025-09-15","Zelle Payment"],["c",161,"2025-09-22","Week of 9/22/25"],["p",161,"2025-09-22","Zelle Payment"],
+          ["c",161,"2025-09-29","Week of 9/29/25"],["p",161,"2025-09-29","Zelle Payment"],["c",161,"2025-10-06","Week of 10/6/25"],
+          ["p",161,"2025-10-06","Zelle Payment"],["c",161,"2025-10-13","Week of 10/13/25"],["p",161,"2025-10-13","Zelle Payment"],
+          ["c",161,"2025-10-20","Week of 10/20/25"],["p",161,"2025-10-20","Zelle Payment"],["c",161,"2025-10-27","Week of 10/27/25"],
+          ["p",161,"2025-10-27","Zelle Payment"],["c",161,"2025-11-03","Week of 11/3/25"],["p",161,"2025-11-03","Zelle Payment"],
+          ["c",161,"2025-11-10","Week of 11/10/25"],["p",161,"2025-11-10","Zelle Payment"],["c",161,"2025-11-17","Week of 11/17/25"],
+          ["p",161,"2025-11-17","Zelle Payment"],["c",161,"2025-11-24","Week of 11/24/25"],["p",161,"2025-11-24","Zelle Payment"],
+          ["c",161,"2025-12-01","Week of 12/1/25"],["p",161,"2025-12-01","Zelle Payment"],["c",161,"2025-12-08","Week of 12/8/25"],
+          ["p",161,"2025-12-08","Zelle Payment"],["c",161,"2025-12-15","Week of 12/15/25"],["p",161,"2025-12-15","Zelle Payment"],
+          ["c",161,"2025-12-22","Week of 12/22/25"],["p",161,"2025-12-22","Zelle Payment"],["c",161,"2025-12-29","Week of 12/29/25"],
+          ["p",161,"2025-12-29","Zelle Payment"],["c",161,"2026-01-05","Week of 1/5/26"],["p",161,"2026-01-05","Zelle Payment"],
+          ["c",161,"2026-01-12","Week of 1/12/26"],["p",161,"2026-01-12","Zelle Payment"],["c",161,"2026-01-19","Week of 1/19/26"],
+          ["p",161,"2026-01-19","Zelle Payment"],["c",161,"2026-01-26","Week of 1/26/26"],["p",161,"2026-01-26","Zelle Payment"],
+          ["c",161,"2026-02-02","Week of 2/2/26"],["p",161,"2026-02-02","Zelle Payment"],["c",161,"2026-02-09","Week of 2/9/26"],
+          ["p",161,"2026-02-09","Zelle Payment"],["c",161,"2026-02-16","Week of 2/16/26"],["p",161,"2026-02-16","Zelle Payment"],
+          ["c",161,"2026-02-23","Week of 2/23/26"],["p",201,"2026-02-23","Zelle Payment"],["c",25,"2026-02-19","Iliana Registration 25/26"],
+          ["p",161,"2026-02-19","Zelle Payment"],["c",161,"2026-02-26","Iliana Security Deposit"],["p",161,"2026-02-26","Zelle Payment"],
+          ["c",337,"2026-03-02","Week of 3/2/26"],["p",161,"2026-03-02","Zelle Payment"],["c",337,"2026-03-09","Week of 3/9/26"],
+          ["p",176,"2026-03-09","Zelle Payment"],["c",337,"2026-03-16","Week of 3/16/26"],["p",161,"2026-03-16","Zelle Payment"],
+          ["c",337,"2026-03-23","Week of 3/23/26"],["p",161,"2026-03-23","Zelle Payment"],["c",337,"2026-03-30","Week of 3/30/26"],
+          ["p",850,"2026-03-30","Zelle Payment"],["c",337,"2026-04-06","Week of 4/6/26"]
+        ];
+        
+        let newTxns = txns.filter(t => t.custId !== bCust.id);
+        bRaw.forEach(r => newTxns.push({ 
+          id: 'tx_' + Math.random().toString(36).substr(2, 9), 
+          custId: bCust.id, 
+          type: r[0]==='c'?'charge':'payment', 
+          amount: r[1], 
+          date: r[2], 
+          note: r[3], 
+          linkedToId: null 
+        }));
+        
+        fbSet(ref(db, 'bb_payments_system/pt_txns_v7'), newTxns);
+        dbCache.pt_txns_v7 = newTxns;
+      }
     }
     
     render(); 
