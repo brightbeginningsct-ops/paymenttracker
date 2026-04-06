@@ -146,7 +146,6 @@ const DB = {
     fbSet(ref(db, 'bb_payments_system/' + k), v); 
   }
 };
-window.DB = DB; // <-- THIS IS THE MAGIC LINE THAT UNLOCKS THE DATABASE FOR THE CONSOLE
 
 let S = { 
   view: 'dashboard', 
@@ -166,7 +165,7 @@ function getCustomerBalance(custId) {
 }
 
 // --- CLOUD SYNC ---
-// This ONLY reads data, it NEVER overwrites with test data.
+// This is the fix. It ONLY reads data, it NEVER overwrites with test data.
 onValue(ref(db, 'bb_payments_system'), (snapshot) => {
   const data = snapshot.val();
   
@@ -487,4 +486,491 @@ function renderCustomerDetail() {
       
       <div class="bal-box">
         <div class="stat-label">Current Balance</div>
-        <div class="stat-value ${activeBal > 0 ? 'val-
+        <div class="stat-value ${activeBal > 0 ? 'val-owed' : 'val-collected'}" style="margin-bottom: 16px;">
+          ${activeBal > 0 ? '$'+fmtH(activeBal) : 'Paid'}
+        </div>
+        <div style="display:flex; gap:10px; justify-content: flex-end;">
+          <button class="btn btn-pk" data-a="open-modal" data-m="add-charge">+ Add Charge</button>
+          <button class="btn btn-y" data-a="open-modal" data-m="add-payment">$ Receive Payment</button>
+        </div>
+      </div>
+    </div>
+
+    <h3 style="margin-bottom: 16px; font-size: 18px; font-weight: 800;">Ledger Timeline</h3>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead><tr><th>Date</th><th>Type</th><th>Description</th><th>Amount</th></tr></thead>
+        <tbody>
+          ${txns.length === 0 ? '<tr><td colspan="4" style="text-align:center; color:var(--muted); padding: 40px;">No transaction history yet.</td></tr>' : ''}
+          ${txns.map(t => {
+            let extraBadge = '';
+            let linkedNote = '';
+            
+            if (t.type === 'charge') {
+               const linkedPmt = txns.find(p => p.type === 'payment' && p.linkedToId === t.id);
+               if (linkedPmt) {
+                  extraBadge = '<span class="badge badge-gn" style="margin-left: 8px;">Paid</span>';
+               } else {
+                  extraBadge = '<span class="badge badge-rd" style="margin-left: 8px;">Unpaid</span>';
+               }
+            } else if (t.type === 'payment' && t.linkedToId) {
+               const linkedCharge = txns.find(c => c.id === t.linkedToId);
+               if (linkedCharge) {
+                  linkedNote = `<br><span style="font-size:11px; color:var(--muted)">↳ Applied to ${new Date(linkedCharge.date).toLocaleDateString()} charge</span>`;
+               }
+            }
+
+            return `
+              <tr>
+                <td class="col-mono" style="font-weight:600">${new Date(t.date).toLocaleDateString()}</td>
+                <td><span class="badge badge-${t.type === 'payment' ? 'gn' : 'rd'}">${t.type === 'payment' ? 'Payment' : 'Charge'}</span>${extraBadge}</td>
+                <td style="color:var(--text); font-weight:600">${t.note}${linkedNote}</td>
+                <td class="col-mono ${t.type === 'payment' ? 'val-collected' : 'val-owed'}">
+                  ${t.type === 'payment' ? '-' : ''}$${fmtH(t.amount)}
+                </td>
+              </tr>
+            `;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+function updateChargeDesc() {
+  const select = document.getElementById('m-quick-rates');
+  if(!select || select.selectedIndex === -1) return;
+  const opt = select.options[select.selectedIndex];
+  
+  const amtField = document.getElementById('m-amt');
+  const noteField = document.getElementById('m-note');
+  
+  amtField.value = opt.value;
+  
+  const type = opt.getAttribute('data-type');
+  const name = opt.getAttribute('data-name');
+  const freq = opt.getAttribute('data-freq');
+
+  if (type === 'program') {
+    noteField.value = freq === 'weekly' ? `${name} - Week of ${getNextMonday()}` : `${name} - Tuition for ${getNextMonth()}`;
+  } else if (type === 'charge') {
+    noteField.value = name;
+  } else {
+    noteField.value = '';
+  }
+}
+
+function renderModal() {
+  if (!S.showModal) return '';
+  const activeCust = DB.getCustomers().find(c => c.id === S.selCustId);
+  const programs = DB.getPrograms();
+  const charges = DB.getCharges();
+
+  if (S.showModal === 'add-customer' || S.showModal === 'edit-customer') {
+    const isEdit = S.showModal === 'edit-customer';
+    const cust = isEdit ? activeCust : { name: '', email: '', phone: '', address: '', archived: false };
+    
+    return `
+      <div class="modal-overlay">
+        <div class="modal">
+          <h2>${isEdit ? 'Edit Family Info' : 'Add New Family'}</h2>
+          
+          <div class="field">
+            <label>Family Name</label>
+            <input type="text" id="m-name" value="${cust.name}" placeholder="e.g. Smith Family" autocomplete="off">
+          </div>
+          
+          <div style="display:flex; gap:12px">
+            <div class="field" style="flex:1">
+              <label>Email Address</label>
+              <input type="email" id="m-email" value="${cust.email}" placeholder="name@example.com">
+            </div>
+            <div class="field" style="flex:1">
+              <label>Phone Number</label>
+              <input type="tel" id="m-phone" value="${cust.phone}" placeholder="(555) 555-5555">
+            </div>
+          </div>
+          
+          <div class="field">
+            <label>Mailing Address</label>
+            <input type="text" id="m-address" value="${cust.address}" placeholder="123 Main St, City, ST 12345">
+          </div>
+
+          <div style="display:flex; gap:12px; margin-top:28px">
+            <button class="btn btn-b btn-full" data-a="save-customer" data-edit="${isEdit}">${isEdit ? 'Save Changes' : 'Create Family'}</button>
+            <button class="btn btn-g btn-full" data-a="close-modal">Cancel</button>
+          </div>
+
+          ${isEdit ? `
+            <div style="margin-top: 24px; border-top: 1.5px solid var(--border); padding-top: 24px;">
+              <button class="btn ${cust.archived ? 'btn-g' : 'btn-rd'} btn-full" data-a="archive-customer">
+                ${cust.archived ? 'Restore Family to Active Status' : 'Archive / Deactivate Family'}
+              </button>
+              ${cust.archived ? `
+              <button class="btn btn-rd btn-full" data-a="delete-customer" style="margin-top: 12px;">
+                Delete Family Permanently
+              </button>
+              ` : ''}
+            </div>
+          ` : ''}
+        </div>
+      </div>
+    `;
+  }
+
+  if (S.showModal === 'edit-program') {
+    const isEdit = !!S.tempId;
+    const prog = isEdit ? programs.find(p => p.id === S.tempId) : { name: '', rate: '', freq: 'weekly' };
+    
+    return `
+      <div class="modal-overlay">
+        <div class="modal">
+          <h2>${isEdit ? 'Edit Program' : 'Create Program'}</h2>
+          <div class="field"><label>Program Name</label><input type="text" id="m-prog-name" value="${prog.name}" placeholder="e.g. Infant Care"></div>
+          <div class="field"><label>Rate Price ($)</label><input type="number" id="m-prog-rate" step="0.01" value="${prog.rate}" placeholder="0.00"></div>
+          <div class="field">
+            <label>Billing Frequency</label>
+            <select id="m-prog-freq">
+              <option value="weekly" ${prog.freq === 'weekly' ? 'selected' : ''}>Weekly</option>
+              <option value="monthly" ${prog.freq === 'monthly' ? 'selected' : ''}>Monthly</option>
+            </select>
+          </div>
+          <div style="display:flex; gap:12px; margin-top:28px">
+            <button class="btn btn-y btn-full" data-a="save-program">Save</button>
+            ${isEdit ? `<button class="btn btn-rd" data-a="delete-program">Delete</button>` : ''}
+            <button class="btn btn-g btn-full" data-a="close-modal">Cancel</button>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  if (S.showModal === 'edit-charge') {
+    const isEdit = !!S.tempId;
+    const charge = isEdit ? charges.find(c => c.id === S.tempId) : { name: '', amount: '' };
+    
+    return `
+      <div class="modal-overlay">
+        <div class="modal">
+          <h2>${isEdit ? 'Edit Standard Charge' : 'Create Standard Charge'}</h2>
+          <div class="field"><label>Charge Name</label><input type="text" id="m-charge-name" value="${charge.name}" placeholder="e.g. Half Day Fee"></div>
+          <div class="field"><label>Amount ($)</label><input type="number" id="m-charge-amt" step="0.01" value="${charge.amount}" placeholder="0.00"></div>
+          <div style="display:flex; gap:12px; margin-top:28px">
+            <button class="btn btn-pk btn-full" data-a="save-charge">Save</button>
+            ${isEdit ? `<button class="btn btn-rd" data-a="delete-charge">Delete</button>` : ''}
+            <button class="btn btn-g btn-full" data-a="close-modal">Cancel</button>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  if (S.showModal === 'add-charge') {
+    const custProgs = (activeCust.progs || []).map(cp => {
+      const p = programs.find(x => x.id === cp.id);
+      return p ? { ...p, disc: cp.disc } : null;
+    }).filter(Boolean);
+
+    return `
+      <div class="modal-overlay">
+        <div class="modal">
+          <h2>Add Charge</h2>
+          <p style="font-size: 14px; font-weight: 800; color: var(--text2); margin-bottom: 20px;">Billing: <strong style="color: var(--blue)">${activeCust?.name}</strong></p>
+          <div class="field"><label>Invoice Date</label><input type="date" id="m-date" value="${now.toISOString().split('T')[0]}"></div>
+          
+          <div class="field">
+            <label>Quick Fill</label>
+            <select id="m-quick-rates" data-i="rate-select">
+              <option value="">-- Custom Charge --</option>
+              ${custProgs.length > 0 ? `
+                <optgroup label="Family's Assigned Programs">
+                  ${custProgs.map(cp => {
+                    const finalAmt = cp.rate * (1 - cp.disc/100);
+                    return `<option value="${finalAmt}" data-type="program" data-name="${cp.name}" data-freq="${cp.freq}">${cp.name} ${cp.disc ? '(Discounted)' : ''} - $${fmtH(finalAmt)}</option>`;
+                  }).join('')}
+                </optgroup>
+              ` : ''}
+              <optgroup label="Standard Charges">
+                ${charges.map(ch => `<option value="${ch.amount}" data-type="charge" data-name="${ch.name}">${ch.name} - $${fmtH(ch.amount)}</option>`).join('')}
+              </optgroup>
+            </select>
+          </div>
+          
+          <div class="field"><label>Amount ($)</label><input type="number" id="m-amt" step="0.01" placeholder="0.00"></div>
+          <div class="field"><label>Description</label><input type="text" id="m-note" placeholder="e.g. Tuition"></div>
+          <div style="display:flex; gap:12px; margin-top:28px">
+            <button class="btn btn-pk btn-full" data-a="save-tx" data-type="charge">Apply Charge</button>
+            <button class="btn btn-g btn-full" data-a="close-modal">Cancel</button>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  if (S.showModal === 'add-payment') {
+    const activeBal = getCustomerBalance(activeCust.id);
+    const allTxns = DB.getTxns();
+    
+    const unpaidCharges = allTxns.filter(t => 
+      t.custId === activeCust.id && 
+      t.type === 'charge' && 
+      !allTxns.some(p => p.type === 'payment' && p.linkedToId === t.id)
+    );
+
+    return `
+      <div class="modal-overlay">
+        <div class="modal">
+          <h2>Receive Payment</h2>
+          <p style="font-size: 14px; font-weight: 800; color: var(--text2); margin-bottom: 20px;">Receiving from: <strong style="color: var(--blue)">${activeCust?.name}</strong></p>
+          
+          <div class="field">
+            <label>Apply to Specific Charge (Optional)</label>
+            <select id="m-linked-charge" data-a="select-linked-charge">
+              <option value="">-- General Payment (Unlinked) --</option>
+              ${unpaidCharges.map(c => `
+                <option value="${c.id}" data-amt="${c.amount}">
+                  ${new Date(c.date).toLocaleDateString()} - ${c.note} ($${fmtH(c.amount)})
+                </option>
+              `).join('')}
+            </select>
+          </div>
+
+          <div class="field"><label>Date Received</label><input type="date" id="m-date" value="${now.toISOString().split('T')[0]}"></div>
+          <div class="field"><label>Amount Paid ($)</label><input type="number" id="m-amt" step="0.01" value="${activeBal > 0 ? fmtH(activeBal) : ''}" placeholder="0.00"></div>
+          <div class="field"><label>Payment Method / Note</label><input type="text" id="m-note" placeholder="e.g. Venmo, Check #1234"></div>
+          <div style="display:flex; gap:12px; margin-top:28px">
+            <button class="btn btn-y btn-full" data-a="save-tx" data-type="payment">Log Payment</button>
+            <button class="btn btn-g btn-full" data-a="close-modal">Cancel</button>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+  return '';
+}
+
+function bindEvents() {
+  document.querySelectorAll('input[data-a="toggle-discount"]').forEach(chk => {
+    chk.onchange = (e) => {
+      const id = e.target.getAttribute('data-id');
+      const draft = S.draftPrograms.map(dp => {
+        if (dp.id === id) return { ...dp, disc: e.target.checked ? 10 : 0 };
+        return dp;
+      });
+      set({ draftPrograms: draft });
+    };
+  });
+
+  const rateSelect = document.getElementById('m-quick-rates');
+  if(rateSelect) {
+    rateSelect.onchange = () => updateChargeDesc();
+  }
+
+  const linkSelect = document.getElementById('m-linked-charge');
+  if(linkSelect) {
+    linkSelect.onchange = (e) => {
+      if (e.target.selectedIndex > 0) {
+        const opt = e.target.options[e.target.selectedIndex];
+        const amt = opt.getAttribute('data-amt');
+        document.getElementById('m-amt').value = amt;
+      }
+    };
+  }
+
+  document.querySelectorAll('[data-a]').forEach(btn => {
+    btn.onclick = () => {
+      const action = btn.getAttribute('data-a');
+
+      if (action === 'nav') set({ view: btn.getAttribute('data-view') });
+      if (action === 'open-modal') set({ showModal: btn.getAttribute('data-m'), tempId: null });
+      if (action === 'close-modal') set({ showModal: null, tempId: null });
+      
+      if (action === 'sel-cust') {
+        const custId = btn.getAttribute('data-cust');
+        const cust = DB.getCustomers().find(c => c.id === custId);
+        set({ 
+          view: 'customer', 
+          selCustId: custId,
+          draftPrograms: cust && cust.progs ? JSON.parse(JSON.stringify(cust.progs)) : [] 
+        });
+      }
+      
+      if (action === 'add-draft-prog') {
+        const selectEl = document.getElementById('draft-prog-select');
+        if (selectEl && selectEl.value && !S.draftPrograms.find(dp => dp.id === selectEl.value)) {
+          set({ draftPrograms: [...S.draftPrograms, {id: selectEl.value, disc: 0}] });
+        }
+      }
+      if (action === 'remove-draft-prog') {
+        const idToRemove = btn.getAttribute('data-id');
+        set({ draftPrograms: S.draftPrograms.filter(dp => dp.id !== idToRemove) });
+      }
+      if (action === 'apply-draft-progs') {
+        if (btn.hasAttribute('disabled')) return;
+        const customers = DB.getCustomers();
+        const idx = customers.findIndex(c => c.id === S.selCustId);
+        if (idx > -1) {
+          customers[idx].progs = [...S.draftPrograms];
+          DB.set('pt_customers_v7', customers);
+          set({}); 
+        }
+      }
+
+      if (action === 'edit-prog') set({ showModal: 'edit-program', tempId: btn.getAttribute('data-id') });
+      if (action === 'edit-charge') set({ showModal: 'edit-charge', tempId: btn.getAttribute('data-id') });
+
+      if (action === 'save-customer') {
+        const name = document.getElementById('m-name').value.trim();
+        const email = document.getElementById('m-email').value.trim();
+        const phone = document.getElementById('m-phone').value.trim();
+        const address = document.getElementById('m-address').value.trim();
+        
+        if (!name) return;
+        
+        const isEdit = btn.getAttribute('data-edit') === 'true';
+        const customers = DB.getCustomers();
+        
+        if (isEdit) {
+          const idx = customers.findIndex(c => c.id === S.selCustId);
+          if (idx > -1) {
+            customers[idx].name = name;
+            customers[idx].email = email;
+            customers[idx].phone = phone;
+            customers[idx].address = address;
+            DB.set('pt_customers_v7', customers);
+            set({ showModal: null });
+          }
+        } else {
+          const newId = 'c_' + genId();
+          customers.push({ id: newId, name, email, phone, address, progs: [], archived: false });
+          DB.set('pt_customers_v7', customers);
+          set({ showModal: null, view: 'customer', selCustId: newId, draftPrograms: [] });
+        }
+      }
+
+      if (action === 'archive-customer') {
+        if(confirm("Are you sure you want to change this family's active status?")) {
+          const customers = DB.getCustomers();
+          const idx = customers.findIndex(c => c.id === S.selCustId);
+          if (idx > -1) {
+            customers[idx].archived = !customers[idx].archived;
+            DB.set('pt_customers_v7', customers);
+            set({ showModal: null, view: 'dashboard', selCustId: null });
+          }
+        }
+      }
+
+      if (action === 'delete-customer') {
+        if(confirm("Are you absolutely sure you want to permanently delete this family? This cannot be undone and their payment history will be deleted.")) {
+          const customers = DB.getCustomers().filter(c => c.id !== S.selCustId);
+          DB.set('pt_customers_v7', customers);
+          
+          const txns = DB.getTxns().filter(t => t.custId !== S.selCustId);
+          DB.set('pt_txns_v7', txns);
+          
+          set({ showModal: null, view: 'dashboard', selCustId: null });
+        }
+      }
+
+      if (action === 'save-program') {
+        const name = document.getElementById('m-prog-name').value.trim();
+        const rate = parseFloat(document.getElementById('m-prog-rate').value);
+        const freq = document.getElementById('m-prog-freq').value;
+        if (!name || isNaN(rate)) return;
+        
+        const programs = DB.getPrograms();
+        if (S.tempId) {
+          const idx = programs.findIndex(p => p.id === S.tempId);
+          if (idx > -1) {
+            programs[idx].name = name;
+            programs[idx].rate = rate;
+            programs[idx].freq = freq;
+          }
+        } else {
+          programs.push({ id: 'p_' + genId(), name, rate, freq });
+        }
+        
+        DB.set('pt_programs_v7', programs);
+        set({ showModal: null, tempId: null });
+      }
+
+      if (action === 'delete-program') {
+        if(confirm("Are you sure you want to delete this program?")) {
+          const programs = DB.getPrograms().filter(p => p.id !== S.tempId);
+          DB.set('pt_programs_v7', programs);
+          
+          const customers = DB.getCustomers().map(c => {
+            if (c.progs) c.progs = c.progs.filter(dp => dp.id !== S.tempId);
+            return c;
+          });
+          DB.set('pt_customers_v7', customers);
+          
+          set({ showModal: null, tempId: null });
+        }
+      }
+
+      if (action === 'save-charge') {
+        const name = document.getElementById('m-charge-name').value.trim();
+        const amount = parseFloat(document.getElementById('m-charge-amt').value);
+        if (!name || isNaN(amount)) return;
+        
+        const charges = DB.getCharges();
+        if (S.tempId) {
+          const idx = charges.findIndex(c => c.id === S.tempId);
+          if (idx > -1) {
+            charges[idx].name = name;
+            charges[idx].amount = amount;
+          }
+        } else {
+          charges.push({ id: 'ch_' + genId(), name, amount });
+        }
+        
+        DB.set('pt_charges_v7', charges);
+        set({ showModal: null, tempId: null });
+      }
+
+      if (action === 'delete-charge') {
+        if(confirm("Are you sure you want to delete this standard charge?")) {
+          const charges = DB.getCharges().filter(c => c.id !== S.tempId);
+          DB.set('pt_charges_v7', charges);
+          set({ showModal: null, tempId: null });
+        }
+      }
+
+      if (action === 'save-tx') {
+        const type = btn.getAttribute('data-type');
+        const amount = parseFloat(document.getElementById('m-amt').value);
+        const date = document.getElementById('m-date').value;
+        const desc = document.getElementById('m-note').value.trim();
+        if (isNaN(amount) || !date) return;
+
+        let linkedToId = null;
+        if (type === 'payment') {
+          const linkedSelect = document.getElementById('m-linked-charge');
+          if (linkedSelect && linkedSelect.value) {
+            linkedToId = linkedSelect.value;
+          }
+        }
+
+        const txns = DB.getTxns();
+        txns.push({ 
+          id: 'tx_' + genId(), 
+          custId: S.selCustId, 
+          type, 
+          amount, 
+          date, 
+          note: desc || (type === 'charge' ? 'Manual Charge' : 'Payment'),
+          linkedToId: linkedToId 
+        });
+        
+        DB.set('pt_txns_v7', txns);
+        set({ showModal: null });
+      }
+    };
+  });
+}
+
+render();
+</script>
+</body>
+</html>
