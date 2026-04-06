@@ -124,7 +124,7 @@ const db = getDatabase(app);
 const genId = () => Math.random().toString(36).substr(2, 9);
 function fmtH(h) { return (h || 0).toFixed(2); }
 
-// Timezone-safe date reading
+// Timezone-safe date reading for display
 function fmtD(str) {
   if (!str) return '';
   const parts = str.split('-');
@@ -678,12 +678,8 @@ function renderModal() {
     const defDate = tx ? tx.date : now.toISOString().split('T')[0];
     const defAmt = tx ? tx.amount : '';
     const defNote = tx ? tx.note : '';
-
-    const cProgs = (activeCust.progs || []).map(cp => {
-      const p = programs.find(x => x.id === cp.id);
-      return p ? { ...p, disc: cp.disc } : null;
-    }).filter(Boolean);
-
+    const cProgs = (activeCust.progs || []).map(cp => { const p = programs.find(x => x.id === cp.id); return p ? { ...p, disc: cp.disc } : null; }).filter(Boolean);
+    
     return `
       <div class="modal-overlay">
         <div class="modal">
