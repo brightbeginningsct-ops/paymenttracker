@@ -128,7 +128,7 @@ function getNextMonday() { const d = new Date(now); d.setDate(d.getDate() + ((1 
 function getNextMonth() { const d = new Date(now); d.setMonth(d.getMonth() + 1); return d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }); }
 
 // --- DATABASE & CLOUD STATE ---
-// Using v7 for linked payments and archive logic
+// Clean v7 state - No PDF Generator logic included, and NO hardcoded overwrite
 let dbCache = {
   pt_programs_v7: [],
   pt_charges_v7: [],
@@ -136,7 +136,6 @@ let dbCache = {
   pt_txns_v7: []
 };
 
-// ⚠️ We use a highly specific root node "bb_payments_system" to ensure 0 overlap with your TimeClock
 const DB = {
   getPrograms() { return dbCache.pt_programs_v7 || []; },
   getCharges() { return dbCache.pt_charges_v7 || []; },
@@ -166,7 +165,7 @@ function getCustomerBalance(custId) {
 }
 
 // --- CLOUD SYNC ---
-// Clean listener without any hardcoded overrides.
+// This is the fix. It ONLY reads data, it NEVER overwrites with test data.
 onValue(ref(db, 'bb_payments_system'), (snapshot) => {
   const data = snapshot.val();
   
